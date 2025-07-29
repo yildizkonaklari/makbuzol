@@ -98,7 +98,7 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important; /* !important eklendi */
         }
 
         .payment-item {
@@ -404,7 +404,14 @@
             }
 
             // Sayfa yüklendiğinde varsayılan olarak ödeme formunu göster
-            showSection('paymentForm');
+            // Tüm modal öğelerinin başlangıçta gizli olduğundan emin ol
+            allPaymentsModal.classList.add('hidden');
+            settingsModal.classList.add('hidden');
+            receiptActions.classList.add('hidden');
+            receiptDisplay.classList.add('hidden');
+            paymentForm.classList.remove('hidden'); // Ödeme formunu başlangıçta göster
+            addPaymentButton.classList.add('hidden'); // Ödeme ekle butonunu başlangıçta gizle
+            
             loadRecentPayments(); // Son ödemeleri de yükle
 
             // Başlık ayarla
