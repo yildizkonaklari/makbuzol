@@ -3,38 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Makbuz Sistemi</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Makbuz Oluşturma Sistemi</h1>
-        <button id="addPaymentButton">Ödeme Ekle</button>
+    <title>Makbuz Oluşturma Sistemi</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Inter fontunu yükle */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-        <div id="paymentForm" class="hidden">
-            <h2>Yeni Ödeme Ekle</h2>
-            <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı">
-            <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)">
-            <input type="text" id="paymentDescription" placeholder="Ödeme Açıklaması">
-            <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı">
-            <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)">
-            <select id="paymentMethod">
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            background-color: #ffffff; /* Beyaz arka plan */
+            padding: 2.5rem;
+            border-radius: 0.75rem; /* rounded-lg */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Hafif gölge */
+            width: 100%;
+            max-width: 64rem; /* max-w-4xl */
+            box-sizing: border-box;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #1f2937; /* Tailwind gray-800 */
+            margin-bottom: 1.5rem;
+            font-weight: 700; /* font-bold */
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="tel"],
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid #d1d5db; /* Tailwind gray-300 */
+            border-radius: 0.375rem; /* rounded-md */
+            box-sizing: border-box;
+            font-size: 1rem;
+            color: #374151; /* Tailwind gray-700 */
+        }
+
+        button {
+            background-color: #2563eb; /* Tailwind blue-600 */
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 0.375rem; /* rounded-md */
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500; /* font-medium */
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        button:hover {
+            background-color: #1d4ed8; /* Tailwind blue-700 */
+        }
+
+        .btn-secondary {
+            background-color: #6b7280; /* Tailwind gray-500 */
+        }
+
+        .btn-secondary:hover {
+            background-color: #4b5563; /* Tailwind gray-600 */
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            justify-content: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .payment-item {
+            border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 0.5rem; /* rounded-lg */
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .payment-item p {
+            margin: 0.25rem 0;
+            color: #4b5563; /* Tailwind gray-600 */
+        }
+
+        .payment-item strong {
+            color: #1f2937; /* Tailwind gray-800 */
+        }
+
+        /* Makbuz Görünümü Stilleri */
+        #receiptDisplay {
+            background-color: #fff;
+            border: 1px dashed #9ca3af; /* Tailwind gray-400 */
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            max-width: 400px; /* Makbuz genişliği */
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #receiptDisplay h3 {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+
+        #receiptDisplay p {
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        #receiptDisplay .receipt-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+
+        #receiptDisplay .receipt-total {
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-top: 1px solid #d1d5db;
+            padding-top: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        #receiptDisplay .receipt-footer {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-top: 1.5rem;
+        }
+
+        /* Yazdırma için özel stil */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #receiptDisplay, #receiptDisplay * {
+                visibility: visible;
+            }
+            #receiptDisplay {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%; /* Yazdırırken tam genişlik kullan */
+                max-width: none; /* Max genişlik kısıtlamasını kaldır */
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center items-start min-h-screen p-8">
+    <div class="container bg-white p-10 rounded-lg shadow-xl w-full max-w-4xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Makbuz Oluşturma Sistemi</h1>
+
+        <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md block mx-auto mb-8 transition duration-200">
+            Ödeme Ekle
+        </button>
+
+        <div id="paymentForm" class="hidden bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
+            <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="paymentDescription" placeholder="Ödeme Açıklaması" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="paymentMethod" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="Nakit">Nakit</option>
                 <option value="Kredi Kartı">Kredi Kartı</option>
             </select>
-            <button id="savePaymentButton">Kaydet</button>
-            <button id="cancelPaymentButton">İptal</button>
+            <div class="btn-group">
+                <button id="savePaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Kaydet ve Makbuz Oluştur</button>
+                <button id="cancelPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">İptal</button>
+            </div>
         </div>
 
-        <h2>Son Eklenen Ödemeler</h2>
-        <div id="recentPayments">
+        <div id="receiptActions" class="hidden text-center mt-6 no-print">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Makbuz Oluşturuldu!</h2>
+            <div class="btn-group">
+                <button id="whatsappButton" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">WhatsApp ile Paylaş</button>
+                <button id="printButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Yazdır</button>
+                <button id="newPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">Yeni Ödeme Ekle</button>
             </div>
+        </div>
+
+        <div id="receiptDisplay" class="hidden mt-8">
+            <!-- Makbuz içeriği buraya JavaScript ile yüklenecek -->
+        </div>
+
+        <h2 class="text-2xl font-bold text-gray-800 mt-10 mb-4">Son Eklenen Ödemeler</h2>
+        <div id="recentPayments" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Ödemeler buraya JavaScript ile yüklenecek -->
+            <p id="noPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
+        </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
+    <script>
+        // Ödemeleri geçici olarak saklayacak dizi
+        let payments = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const addPaymentButton = document.getElementById('addPaymentButton');
+            const paymentForm = document.getElementById('paymentForm');
+            const savePaymentButton = document.getElementById('savePaymentButton');
+            const cancelPaymentButton = document.getElementById('cancelPaymentButton');
+            const recentPaymentsDiv = document.getElementById('recentPayments');
+            const noPaymentsMessage = document.getElementById('noPaymentsMessage');
+            const receiptDisplay = document.getElementById('receiptDisplay');
+            const receiptActions = document.getElementById('receiptActions');
+            const whatsappButton = document.getElementById('whatsappButton');
+            const printButton = document.getElementById('printButton');
+            const newPaymentButton = document.getElementById('newPaymentButton');
+
+            // Formu göster/gizle
+            addPaymentButton.addEventListener('click', () => {
+                paymentForm.classList.remove('hidden');
+                addPaymentButton.classList.add('hidden');
+                receiptDisplay.classList.add('hidden'); // Makbuzu gizle
+                receiptActions.classList.add('hidden'); // Makbuz aksiyonlarını gizle
+            });
+
+            // Formu iptal et
+            cancelPaymentButton.addEventListener('click', () => {
+                paymentForm.classList.add('hidden');
+                addPaymentButton.classList.remove('hidden');
+                clearForm();
+            });
+
+            // Yeni ödeme ekle butonuna basınca formu tekrar aç
+            newPaymentButton.addEventListener('click', () => {
+                receiptDisplay.classList.add('hidden');
+                receiptActions.classList.add('hidden');
+                paymentForm.classList.remove('hidden');
+                addPaymentButton.classList.add('hidden'); // Ödeme ekle butonunu gizle
+                clearForm(); // Formu temizle
+            });
+
+            // Ödemeyi kaydet ve makbuz oluştur
+            savePaymentButton.addEventListener('click', () => {
+                const payerName = document.getElementById('payerName').value.trim();
+                const childName = document.getElementById('childName').value.trim();
+                const paymentDescription = document.getElementById('paymentDescription').value.trim();
+                const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
+                const phoneNumber = document.getElementById('phoneNumber').value.trim();
+                const paymentMethod = document.getElementById('paymentMethod').value;
+                const paymentDate = new Date(); // Bugünün tarihi
+
+                if (!payerName || isNaN(paymentAmount) || paymentAmount <= 0 || !phoneNumber) {
+                    alert('Lütfen tüm zorunlu alanları (Ödeme Yapan Kişi, Tutar, Telefon Numarası) doğru şekilde doldurun.');
+                    return;
+                }
+
+                const paymentData = {
+                    id: Date.now(), // Benzersiz ID
+                    payerName,
+                    childName: childName || 'Belirtilmedi',
+                    paymentDescription: paymentDescription || 'Yok',
+                    paymentAmount,
+                    phoneNumber,
+                    paymentMethod,
+                    paymentDate: paymentDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                    paymentTime: paymentDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                };
+
+                payments.unshift(paymentData); // En başa ekle
+                loadRecentPayments(); // Ödemeleri yeniden yükle
+                clearForm(); // Formu temizle
+                paymentForm.classList.add('hidden'); // Formu gizle
+                addPaymentButton.classList.remove('hidden'); // Ödeme ekle butonunu göster
+
+                // Makbuzu göster
+                displayReceipt(paymentData);
+                receiptDisplay.classList.remove('hidden');
+                receiptActions.classList.remove('hidden');
+            });
+
+            // Son eklenen ödemeleri yükle
+            function loadRecentPayments() {
+                recentPaymentsDiv.innerHTML = ''; // Önceki ödemeleri temizle
+                if (payments.length === 0) {
+                    noPaymentsMessage.classList.remove('hidden');
+                } else {
+                    noPaymentsMessage.classList.add('hidden');
+                    // Sadece son 5 ödemeyi göster
+                    payments.slice(0, 5).forEach(payment => {
+                        const paymentItem = document.createElement('div');
+                        paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4');
+                        paymentItem.innerHTML = `
+                            <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
+                            <p class="text-gray-700"><strong>Çocuk:</strong> ${payment.childName}</p>
+                            <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
+                            <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
+                            <p class="text-gray-700"><strong>Ödeme Şekli:</strong> ${payment.paymentMethod}</p>
+                            <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
+                        `;
+                        recentPaymentsDiv.appendChild(paymentItem);
+                    });
+                }
+            }
+
+            // Formu temizle
+            function clearForm() {
+                document.getElementById('payerName').value = '';
+                document.getElementById('childName').value = '';
+                document.getElementById('paymentDescription').value = '';
+                document.getElementById('paymentAmount').value = '';
+                document.getElementById('phoneNumber').value = '';
+                document.getElementById('paymentMethod').value = 'Nakit';
+            }
+
+            // Makbuzu HTML olarak oluştur ve göster
+            function displayReceipt(payment) {
+                receiptDisplay.innerHTML = `
+                    <h3 class="text-2xl font-bold mb-4 text-gray-800">Makbuz</h3>
+                    <div class="mb-4">
+                        <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
+                        <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-lg font-semibold text-gray-700 mb-2">Ödeyen Bilgileri:</p>
+                        <p class="receipt-line"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
+                        <p class="receipt-line"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
+                        ${payment.childName !== 'Belirtilmedi' ? `<p class="receipt-line"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-lg font-semibold text-gray-700 mb-2">Ödeme Bilgileri:</p>
+                        <p class="receipt-line"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
+                        <p class="receipt-line"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
+                    </div>
+                    <div class="receipt-total text-xl font-bold text-gray-900">
+                        <p class="receipt-line"><span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span></p>
+                    </div>
+                    <p class="receipt-footer text-gray-600 mt-6">Teşekkür ederiz!</p>
+                `;
+            }
+
+            // WhatsApp ile paylaş
+            whatsappButton.addEventListener('click', () => {
+                const currentReceiptData = payments[0]; // En son eklenen makbuz
+                if (!currentReceiptData) {
+                    alert('Paylaşılacak bir makbuz bulunmuyor.');
+                    return;
+                }
+
+                const message = `Makbuz Bilgileri:\n` +
+                                `-----------------------------------\n` +
+                                `Makbuz No: #${currentReceiptData.id}\n` +
+                                `Tarih: ${currentReceiptData.paymentDate} ${currentReceiptData.paymentTime}\n` +
+                                `Ödeyen Kişi: ${currentReceiptData.payerName}\n` +
+                                `Çocuk Adı: ${currentReceiptData.childName}\n` +
+                                `Ödeme Tutarı: ${currentReceiptData.paymentAmount.toFixed(2)} TL\n` +
+                                `Ödeme Açıklaması: ${currentReceiptData.paymentDescription}\n` +
+                                `Ödeme Şekli: ${currentReceiptData.paymentMethod}\n` +
+                                `-----------------------------------\n` +
+                                `Teşekkür ederiz!`;
+
+                let whatsappNum = currentReceiptData.phoneNumber.replace(/\s/g, ''); // Boşlukları kaldır
+                if (whatsappNum.startsWith('0')) {
+                    whatsappNum = '90' + whatsappNum.substring(1); // 0'ı kaldırıp 90 ekle
+                } else if (!whatsappNum.startsWith('90')) {
+                    whatsappNum = '90' + whatsappNum; // Başında 90 yoksa ekle (Basit varsayım)
+                }
+                
+                const whatsappUrl = `https://wa.me/${whatsappNum}?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+            });
+
+            // Makbuzu yazdır
+            printButton.addEventListener('click', () => {
+                // Sadece makbuz div'ini yazdırmak için CSS media query kullanıldı
+                window.print();
+            });
+
+            // Sayfa yüklendiğinde son ödemeleri göster (eğer varsa)
+            loadRecentPayments();
+        });
+    </script>
 </body>
 </html>
