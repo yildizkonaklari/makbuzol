@@ -383,6 +383,30 @@
             const monthlyReportOutput = document.getElementById('monthlyReportOutput');
             const clearPaymentsButton = document.getElementById('clearPaymentsButton'); // Ayarlar modalına taşındı
 
+            // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
+            function showSection(sectionId) {
+                // Tüm ana içerik alanlarını gizle
+                paymentForm.classList.add('hidden');
+                receiptDisplay.classList.add('hidden');
+                receiptActions.classList.add('hidden');
+                allPaymentsModal.classList.add('hidden');
+                settingsModal.classList.add('hidden');
+
+                // İstenen bölümü göster
+                document.getElementById(sectionId).classList.remove('hidden');
+
+                // addPaymentButton'ın görünürlüğünü yönet
+                if (sectionId === 'paymentForm') {
+                    addPaymentButton.classList.add('hidden'); // Ödeme formu açıksa gizle
+                } else {
+                    addPaymentButton.classList.remove('hidden'); // Diğer bölümler açıksa göster
+                }
+            }
+
+            // Sayfa yüklendiğinde varsayılan olarak ödeme formunu göster
+            showSection('paymentForm');
+            loadRecentPayments(); // Son ödemeleri de yükle
+
             // Başlık ayarla
             setCustomTitleButton.addEventListener('click', () => {
                 const newTitle = customTitleInput.value.trim();
@@ -395,27 +419,20 @@
                 }
             });
 
-            // Formu göster/gizle
+            // Ödeme Ekle butonu
             addPaymentButton.addEventListener('click', () => {
-                paymentForm.classList.remove('hidden');
-                addPaymentButton.classList.add('hidden');
-                receiptDisplay.classList.add('hidden'); // Makbuzu gizle
-                receiptActions.classList.add('hidden'); // Makbuz aksiyonlarını gizle
+                showSection('paymentForm');
             });
 
             // Formu iptal et
             cancelPaymentButton.addEventListener('click', () => {
-                paymentForm.classList.add('hidden');
-                addPaymentButton.classList.remove('hidden');
+                showSection('paymentForm'); // İptal edince ödeme formuna geri dön
                 clearForm();
             });
 
             // Yeni ödeme ekle butonuna basınca formu tekrar aç
             newPaymentButton.addEventListener('click', () => {
-                receiptDisplay.classList.add('hidden');
-                receiptActions.classList.add('hidden');
-                paymentForm.classList.remove('hidden');
-                addPaymentButton.classList.add('hidden'); // Ödeme ekle butonunu gizle
+                showSection('paymentForm'); // Yeni ödeme ekle deyince ödeme formuna geri dön
                 clearForm(); // Formu temizle
             });
 
@@ -450,13 +467,11 @@
                 payments.unshift(paymentData); // En başa ekle
                 loadRecentPayments(); // Ödemeleri yeniden yükle
                 clearForm(); // Formu temizle
-                paymentForm.classList.add('hidden'); // Formu gizle
-                addPaymentButton.classList.remove('hidden'); // Ödeme ekle butonunu göster
-
-                // Makbuzu göster
+                
+                // Makbuzu göster ve aksiyon butonlarını göster
                 displayReceipt(paymentData);
-                receiptDisplay.classList.remove('hidden');
-                receiptActions.classList.remove('hidden');
+                showSection('receiptActions'); // Makbuz aksiyonlarını göster
+                receiptDisplay.classList.remove('hidden'); // Makbuz görüntüsünü göster
             });
 
             // Son eklenen ödemeleri yükle
@@ -578,13 +593,13 @@
 
             // Tüm Ödemeler Butonu
             allPaymentsButton.addEventListener('click', () => {
-                allPaymentsModal.classList.remove('hidden');
+                showSection('allPaymentsModal');
                 loadAllPayments();
             });
 
             // Tüm Ödemeler Modalı kapatma
             closeAllPaymentsModalButton.addEventListener('click', () => {
-                allPaymentsModal.classList.add('hidden');
+                showSection('paymentForm'); // Modalı kapatınca ödeme formuna geri dön
             });
 
             // Tüm ödemeleri modalda listele
@@ -610,7 +625,7 @@
 
             // Ayarlar Butonu
             settingsButton.addEventListener('click', () => {
-                settingsModal.classList.remove('hidden');
+                showSection('settingsModal');
                 // Ayarlar modalı açıldığında aylık rapor seçicilerini doldur
                 populateMonthYearSelectors();
                 monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
@@ -618,7 +633,7 @@
 
             // Ayarlar Modalı kapatma
             closeSettingsModalButton.addEventListener('click', () => {
-                settingsModal.classList.add('hidden');
+                showSection('paymentForm'); // Modalı kapatınca ödeme formuna geri dön
             });
 
             // Ay ve Yıl Seçicilerini Doldur
