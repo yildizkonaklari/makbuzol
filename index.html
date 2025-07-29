@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Makbuz Oluşturma Sistemi</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         /* Inter fontunu yükle */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -74,11 +75,26 @@
             background-color: #4b5563; /* Tailwind gray-600 */
         }
 
+        .btn-danger {
+            background-color: #dc2626; /* Tailwind red-600 */
+        }
+        .btn-danger:hover {
+            background-color: #b91c1c; /* Tailwind red-700 */
+        }
+
+        .btn-success {
+            background-color: #10b981; /* Tailwind green-500 */
+        }
+        .btn-success:hover {
+            background-color: #059669; /* Tailwind green-600 */
+        }
+
         .btn-group {
             display: flex;
             gap: 0.75rem;
             margin-top: 1rem;
             justify-content: center;
+            flex-wrap: wrap; /* Küçük ekranlarda sarmalama */
         }
 
         .hidden {
@@ -151,6 +167,47 @@
             margin-top: 1.5rem;
         }
 
+        /* Modal Stilleri */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #4b5563;
+        }
+
+        .modal-close-button:hover {
+            color: #1f2937;
+        }
+
         /* Yazdırma için özel stil */
         @media print {
             body * {
@@ -178,12 +235,34 @@
 </head>
 <body class="bg-gray-100 flex justify-center items-start min-h-screen p-8">
     <div class="container bg-white p-10 rounded-lg shadow-xl w-full max-w-4xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">Makbuz Oluşturma Sistemi</h1>
+        <h1 id="mainTitle" class="text-3xl font-bold text-gray-800 mb-6">Makbuz Oluşturma Sistemi</h1>
 
-        <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md block mx-auto mb-8 transition duration-200">
-            Ödeme Ekle
-        </button>
+        <!-- Başlık Oluşturma Alanı -->
+        <div class="mb-8 p-4 bg-blue-50 rounded-md shadow-sm">
+            <h2 class="text-xl font-semibold text-blue-800 mb-3">Başlık Oluştur</h2>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input type="text" id="customTitleInput" placeholder="Makbuz Başlığını Buraya Girin" class="flex-grow p-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button id="setCustomTitleButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">Başlığı Ayarla</button>
+            </div>
+        </div>
 
+        <!-- Ana İşlem Butonları -->
+        <div class="btn-group mb-8">
+            <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+                Ödeme Ekle
+            </button>
+            <button id="allPaymentsButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+                Tüm Ödemeler
+            </button>
+            <button id="monthlyReportButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+                Aylık Rapor
+            </button>
+            <button id="clearPaymentsButton" class="btn-danger bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+                Ödeme Kayıtlarını Sil
+            </button>
+        </div>
+
+        <!-- Ödeme Ekleme Formu -->
         <div id="paymentForm" class="hidden bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
             <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -201,19 +280,23 @@
             </div>
         </div>
 
+        <!-- Makbuz Oluşturuldu Aksiyonları -->
         <div id="receiptActions" class="hidden text-center mt-6 no-print">
             <h2 class="text-xl font-semibold text-gray-800 mb-4">Makbuz Oluşturuldu!</h2>
             <div class="btn-group">
                 <button id="whatsappButton" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">WhatsApp ile Paylaş</button>
+                <button id="downloadPdfButton" class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">PDF Olarak İndir</button>
                 <button id="printButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Yazdır</button>
                 <button id="newPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">Yeni Ödeme Ekle</button>
             </div>
         </div>
 
+        <!-- Makbuz Görüntüleme Alanı -->
         <div id="receiptDisplay" class="hidden mt-8">
             <!-- Makbuz içeriği buraya JavaScript ile yüklenecek -->
         </div>
 
+        <!-- Son Eklenen Ödemeler -->
         <h2 class="text-2xl font-bold text-gray-800 mt-10 mb-4">Son Eklenen Ödemeler</h2>
         <div id="recentPayments" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Ödemeler buraya JavaScript ile yüklenecek -->
@@ -221,12 +304,51 @@
         </div>
     </div>
 
+    <!-- Tüm Ödemeler ve Aylık Rapor Modalı -->
+    <div id="allPaymentsModal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close-button" id="closeModalButton">&times;</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Tüm Ödemeler ve Raporlar</h2>
+
+            <!-- Aylık Rapor Kontrolleri -->
+            <div class="mb-6 p-4 bg-yellow-50 rounded-md shadow-sm">
+                <h3 class="text-xl font-semibold text-yellow-800 mb-3">Aylık Rapor Oluştur</h3>
+                <div class="flex flex-col sm:flex-row gap-3 items-center">
+                    <select id="reportMonth" class="p-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 flex-grow">
+                        <!-- Aylar JavaScript ile doldurulacak -->
+                    </select>
+                    <select id="reportYear" class="p-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 flex-grow">
+                        <!-- Yıllar JavaScript ile doldurulacak -->
+                    </select>
+                    <button id="generateReportButton" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Raporu Göster</button>
+                </div>
+                <div id="monthlyReportOutput" class="mt-4 p-3 bg-white border border-yellow-200 rounded-md hidden">
+                    <!-- Aylık rapor buraya gelecek -->
+                </div>
+            </div>
+
+            <!-- Tüm Ödemeler Listesi -->
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Tüm Ödeme Kayıtları</h3>
+            <div id="allPaymentsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <p id="noAllPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Ödemeleri geçici olarak saklayacak dizi
         let payments = [];
+        // Özel başlık
+        let customTitle = "Makbuz Oluşturma Sistemi";
 
         document.addEventListener('DOMContentLoaded', () => {
+            const mainTitle = document.getElementById('mainTitle');
+            const customTitleInput = document.getElementById('customTitleInput');
+            const setCustomTitleButton = document.getElementById('setCustomTitleButton');
             const addPaymentButton = document.getElementById('addPaymentButton');
+            const allPaymentsButton = document.getElementById('allPaymentsButton');
+            const monthlyReportButton = document.getElementById('monthlyReportButton');
+            const clearPaymentsButton = document.getElementById('clearPaymentsButton');
             const paymentForm = document.getElementById('paymentForm');
             const savePaymentButton = document.getElementById('savePaymentButton');
             const cancelPaymentButton = document.getElementById('cancelPaymentButton');
@@ -235,8 +357,30 @@
             const receiptDisplay = document.getElementById('receiptDisplay');
             const receiptActions = document.getElementById('receiptActions');
             const whatsappButton = document.getElementById('whatsappButton');
+            const downloadPdfButton = document.getElementById('downloadPdfButton');
             const printButton = document.getElementById('printButton');
             const newPaymentButton = document.getElementById('newPaymentButton');
+
+            const allPaymentsModal = document.getElementById('allPaymentsModal');
+            const closeModalButton = document.getElementById('closeModalButton');
+            const allPaymentsList = document.getElementById('allPaymentsList');
+            const noAllPaymentsMessage = document.getElementById('noAllPaymentsMessage');
+            const reportMonthSelect = document.getElementById('reportMonth');
+            const reportYearSelect = document.getElementById('reportYear');
+            const generateReportButton = document.getElementById('generateReportButton');
+            const monthlyReportOutput = document.getElementById('monthlyReportOutput');
+
+            // Başlık ayarla
+            setCustomTitleButton.addEventListener('click', () => {
+                const newTitle = customTitleInput.value.trim();
+                if (newTitle) {
+                    customTitle = newTitle;
+                    mainTitle.textContent = customTitle;
+                    alert('Başlık başarıyla güncellendi!');
+                } else {
+                    alert('Lütfen bir başlık girin.');
+                }
+            });
 
             // Formu göster/gizle
             addPaymentButton.addEventListener('click', () => {
@@ -286,7 +430,8 @@
                     phoneNumber,
                     paymentMethod,
                     paymentDate: paymentDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-                    paymentTime: paymentDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                    paymentTime: paymentDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                    fullDate: paymentDate // Raporlama için tam tarih objesi
                 };
 
                 payments.unshift(paymentData); // En başa ekle
@@ -338,7 +483,7 @@
             // Makbuzu HTML olarak oluştur ve göster
             function displayReceipt(payment) {
                 receiptDisplay.innerHTML = `
-                    <h3 class="text-2xl font-bold mb-4 text-gray-800">Makbuz</h3>
+                    <h3 class="text-2xl font-bold mb-4 text-gray-800">${customTitle}</h3>
                     <div class="mb-4">
                         <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
                         <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
@@ -369,7 +514,7 @@
                     return;
                 }
 
-                const message = `Makbuz Bilgileri:\n` +
+                const message = `*${customTitle}*\n` +
                                 `-----------------------------------\n` +
                                 `Makbuz No: #${currentReceiptData.id}\n` +
                                 `Tarih: ${currentReceiptData.paymentDate} ${currentReceiptData.paymentTime}\n` +
@@ -392,10 +537,148 @@
                 window.open(whatsappUrl, '_blank');
             });
 
+            // Makbuzu PDF olarak indir
+            downloadPdfButton.addEventListener('click', () => {
+                const element = document.getElementById('receiptDisplay');
+                if (element.classList.contains('hidden')) {
+                    alert('Önce bir makbuz oluşturun.');
+                    return;
+                }
+                const opt = {
+                    margin:       10,
+                    filename:     `makbuz_${payments[0].id}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, logging: true, dpi: 192, letterRendering: true },
+                    jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            });
+
             // Makbuzu yazdır
             printButton.addEventListener('click', () => {
-                // Sadece makbuz div'ini yazdırmak için CSS media query kullanıldı
+                if (receiptDisplay.classList.contains('hidden')) {
+                    alert('Önce bir makbuz oluşturun.');
+                    return;
+                }
                 window.print();
+            });
+
+            // Tüm Ödemeler Butonu
+            allPaymentsButton.addEventListener('click', () => {
+                allPaymentsModal.classList.remove('hidden');
+                loadAllPayments();
+                populateMonthYearSelectors(); // Modal açıldığında seçicileri doldur
+                monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
+            });
+
+            // Modalı kapat
+            closeModalButton.addEventListener('click', () => {
+                allPaymentsModal.classList.add('hidden');
+            });
+
+            // Tüm ödemeleri modalda listele
+            function loadAllPayments() {
+                allPaymentsList.innerHTML = '';
+                if (payments.length === 0) {
+                    noAllPaymentsMessage.classList.remove('hidden');
+                } else {
+                    noAllPaymentsMessage.classList.add('hidden');
+                    payments.forEach(payment => {
+                        const paymentItem = document.createElement('div');
+                        paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4');
+                        paymentItem.innerHTML = `
+                            <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
+                            <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
+                            <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
+                            <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
+                        `;
+                        allPaymentsList.appendChild(paymentItem);
+                    });
+                }
+            }
+
+            // Aylık rapor butonuna basınca modalı aç ve rapor kontrollerini göster
+            monthlyReportButton.addEventListener('click', () => {
+                allPaymentsModal.classList.remove('hidden');
+                populateMonthYearSelectors();
+                allPaymentsList.innerHTML = '<p class="col-span-full text-center text-gray-500">Aylık raporu görmek için yukarıdaki seçenekleri kullanın.</p>';
+                noAllPaymentsMessage.classList.add('hidden');
+            });
+
+            // Ay ve Yıl Seçicilerini Doldur
+            function populateMonthYearSelectors() {
+                reportMonthSelect.innerHTML = '';
+                reportYearSelect.innerHTML = '';
+
+                const months = [
+                    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+                ];
+                const currentYear = new Date().getFullYear();
+
+                months.forEach((month, index) => {
+                    const option = document.createElement('option');
+                    option.value = index; // 0-11 arası ay indeksi
+                    option.textContent = month;
+                    reportMonthSelect.appendChild(option);
+                });
+
+                for (let i = currentYear - 5; i <= currentYear + 1; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = i;
+                    if (i === currentYear) {
+                        option.selected = true;
+                    }
+                    reportYearSelect.appendChild(option);
+                }
+                reportMonthSelect.value = new Date().getMonth(); // Mevcut ayı seçili yap
+            }
+
+            // Rapor Oluştur Butonu
+            generateReportButton.addEventListener('click', () => {
+                const selectedMonth = parseInt(reportMonthSelect.value);
+                const selectedYear = parseInt(reportYearSelect.value);
+
+                // Seçeneklerin varlığını kontrol et
+                if (reportMonthSelect.options[reportMonthSelect.selectedIndex] === undefined) {
+                    monthlyReportOutput.innerHTML = `<p class="text-red-600">Ay veya yıl seçimi geçersiz. Lütfen tekrar deneyin.</p>`;
+                    monthlyReportOutput.classList.remove('hidden');
+                    return;
+                }
+
+                const filteredPayments = payments.filter(payment => {
+                    const paymentDate = payment.fullDate;
+                    return paymentDate.getMonth() === selectedMonth && paymentDate.getFullYear() === selectedYear;
+                });
+
+                let totalAmount = 0;
+                let reportHtml = `<h3 class="text-lg font-semibold text-gray-800 mb-2">${reportMonthSelect.options[reportMonthSelect.selectedIndex].text} ${selectedYear} Ayı Raporu</h3>`;
+                
+                if (filteredPayments.length === 0) {
+                    reportHtml += `<p class="text-gray-600">Bu ay için ödeme bulunmamaktadır.</p>`;
+                } else {
+                    reportHtml += `<ul class="list-disc pl-5 text-gray-700">`;
+                    filteredPayments.forEach(payment => {
+                        totalAmount += payment.paymentAmount;
+                        reportHtml += `<li>${payment.payerName} - ${payment.paymentAmount.toFixed(2)} TL (${payment.paymentMethod}) - ${payment.paymentDate}</li>`;
+                    });
+                    reportHtml += `</ul>`;
+                    reportHtml += `<p class="text-lg font-bold text-gray-900 mt-4">Toplam Gelir: ${totalAmount.toFixed(2)} TL</p>`;
+                }
+                monthlyReportOutput.innerHTML = reportHtml;
+                monthlyReportOutput.classList.remove('hidden');
+            });
+
+            // Ödeme Kayıtlarını Sil Butonu
+            clearPaymentsButton.addEventListener('click', () => {
+                if (confirm('Tüm ödeme kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                    payments = []; // Diziyi sıfırla
+                    loadRecentPayments(); // Ana sayfadaki listeyi güncelle
+                    loadAllPayments(); // Modal'daki listeyi güncelle
+                    alert('Tüm ödeme kayıtları silindi.');
+                    monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
+                }
             });
 
             // Sayfa yüklendiğinde son ödemeleri göster (eğer varsa)
