@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Makbuz Sistemi</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Makbuz Oluşturma Sistemi</h1>
+        <button id="addPaymentButton">Ödeme Ekle</button>
+
+        <div id="paymentForm" class="hidden">
+            <h2>Yeni Ödeme Ekle</h2>
+            <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı">
+            <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)">
+            <input type="text" id="paymentDescription" placeholder="Ödeme Açıklaması">
+            <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı">
+            <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)">
+            <select id="paymentMethod">
+                <option value="Nakit">Nakit</option>
+                <option value="Kredi Kartı">Kredi Kartı</option>
+            </select>
+            <button id="savePaymentButton">Kaydet</button>
+            <button id="cancelPaymentButton">İptal</button>
+        </div>
+
+        <h2>Son Eklenen Ödemeler</h2>
+        <div id="recentPayments">
+            </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
