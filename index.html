@@ -40,6 +40,7 @@
         input[type="text"],
         input[type="number"],
         input[type="tel"],
+        textarea, /* textarea için stil eklendi */
         select {
             width: 100%;
             padding: 0.75rem;
@@ -49,6 +50,11 @@
             box-sizing: border-box;
             font-size: 1rem;
             color: #374151; /* Tailwind gray-700 */
+        }
+
+        textarea {
+            resize: vertical; /* Sadece dikey yeniden boyutlandırma */
+            min-height: 6rem; /* Minimum yükseklik */
         }
 
         button {
@@ -208,24 +214,60 @@
             color: #1f2937;
         }
 
+        /* PDF İçin Özel Konteyner Stilleri */
+        #pdfPrintContainer {
+            width: 210mm; /* A4 genişliği */
+            height: 297mm; /* A4 yüksekliği */
+            padding: 10mm; /* Kenar boşlukları */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around; /* Makbuzları dikeyde eşit dağıt */
+            align-items: center;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf {
+            width: 100%;
+            max-width: 148mm; /* Yaklaşık A5 genişliği */
+            border: 1px dashed #9ca3af;
+            padding: 10mm;
+            margin-bottom: 5mm; /* İki makbuz arası boşluk */
+            box-sizing: border-box;
+            page-break-inside: avoid; /* Makbuzun ortadan bölünmemesini sağlar */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf:last-child {
+            margin-bottom: 0;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf h3 {
+            font-size: 1.2rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf p {
+            font-size: 0.8rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf .receipt-total {
+            font-size: 0.9rem;
+        }
+
+
         /* Yazdırma için özel stil */
         @media print {
             body * {
                 visibility: hidden;
             }
-            #receiptDisplay, #receiptDisplay * {
+            #pdfPrintContainer, #pdfPrintContainer * { /* Sadece PDF konteynerini yazdır */
                 visibility: visible;
             }
-            #receiptDisplay {
+            #pdfPrintContainer {
                 position: absolute;
                 left: 0;
                 top: 0;
-                width: 100%; /* Yazdırırken tam genişlik kullan */
-                max-width: none; /* Max genişlik kısıtlamasını kaldır */
-                border: none;
-                box-shadow: none;
+                width: 210mm;
+                height: 297mm;
                 padding: 0;
                 margin: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-around;
+                align-items: center;
             }
             .no-print {
                 display: none;
@@ -255,7 +297,7 @@
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
             <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="text" id="paymentDescription" placeholder="Ödeme Açıklaması" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <textarea id="paymentDescription" placeholder="Ödeme Açıklaması" rows="3" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <select id="paymentMethod" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -345,11 +387,18 @@
         </div>
     </div>
 
+    <!-- PDF oluşturmak için gizli konteyner -->
+    <div id="pdfPrintContainer" class="hidden"></div>
+
     <script>
         // Ödemeleri geçici olarak saklayacak dizi
         let payments = [];
         // Özel başlık
         let customTitle = "Makbuz Oluşturma Sistemi";
+
+        // Şifreler
+        const savePassword = '5210';
+        const clearPassword = '1052';
 
         document.addEventListener('DOMContentLoaded', () => {
             const mainTitle = document.getElementById('mainTitle');
@@ -382,6 +431,8 @@
             const generateReportButton = document.getElementById('generateReportButton');
             const monthlyReportOutput = document.getElementById('monthlyReportOutput');
             const clearPaymentsButton = document.getElementById('clearPaymentsButton'); // Ayarlar modalına taşındı
+
+            const pdfPrintContainer = document.getElementById('pdfPrintContainer'); // PDF için gizli konteyner
 
             // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
             function showSection(sectionId) {
@@ -445,6 +496,14 @@
 
             // Ödemeyi kaydet ve makbuz oluştur
             savePaymentButton.addEventListener('click', () => {
+                const enteredPassword = prompt("Makbuz oluşturmak için şifreyi girin:");
+                if (enteredPassword !== savePassword) {
+                    alert("Yanlış şifre! Makbuz oluşturulamadı.");
+                    // Önceki ekrana dönmek için formu tekrar göster
+                    showSection('paymentForm');
+                    return;
+                }
+
                 const payerName = document.getElementById('payerName').value.trim();
                 const childName = document.getElementById('childName').value.trim();
                 const paymentDescription = document.getElementById('paymentDescription').value.trim();
@@ -572,31 +631,63 @@
                 window.open(whatsappUrl, '_blank');
             });
 
-            // Makbuzu PDF olarak indir
-            downloadPdfButton.addEventListener('click', () => {
-                const element = document.getElementById('receiptDisplay');
-                if (element.classList.contains('hidden')) {
-                    alert('Önce bir makbuz oluşturun.');
+            // Makbuzu PDF olarak indir veya Yazdır
+            function generatePdfAndOrPrint(action) {
+                const currentReceiptData = payments[0]; // En son eklenen makbuz
+                if (!currentReceiptData) {
+                    alert('PDF oluşturulacak veya yazdırılacak bir makbuz bulunmuyor.');
                     return;
                 }
-                const opt = {
-                    margin:       10,
-                    filename:     `makbuz_${payments[0].id}.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, logging: true, dpi: 192, letterRendering: true },
-                    jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
-                };
-                html2pdf().set(opt).from(element).save();
-            });
 
-            // Makbuzu yazdır
-            printButton.addEventListener('click', () => {
-                if (receiptDisplay.classList.contains('hidden')) {
-                    alert('Önce bir makbuz oluşturun.');
-                    return;
+                // PDF konteynerini temizle
+                pdfPrintContainer.innerHTML = '';
+
+                // İki adet makbuz içeriği oluştur
+                for (let i = 0; i < 2; i++) {
+                    const receiptContent = `
+                        <div class="receipt-item-for-pdf">
+                            <h3 class="text-center font-bold mb-2 text-gray-800">${customTitle}</h3>
+                            <div class="mb-2">
+                                <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${currentReceiptData.id}</span></p>
+                                <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${currentReceiptData.paymentDate} ${currentReceiptData.paymentTime}</span></p>
+                            </div>
+                            <div class="mb-2">
+                                <p class="text-sm font-semibold text-gray-700 mb-1">Ödeyen Bilgileri:</p>
+                                <p class="receipt-line"><span><strong>Adı Soyadı:</strong></span> <span>${currentReceiptData.payerName}</span></p>
+                                <p class="receipt-line"><span><strong>Telefon:</strong></span> <span>${currentReceiptData.phoneNumber}</span></p>
+                                ${currentReceiptData.childName !== 'Belirtilmedi' ? `<p class="receipt-line"><span><strong>Çocuk Adı:</strong></span> <span>${currentReceiptData.childName}</span></p>` : ''}
+                            </div>
+                            <div class="mb-2">
+                                <p class="text-sm font-semibold text-gray-700 mb-1">Ödeme Bilgileri:</p>
+                                <p class="receipt-line"><span><strong>Açıklama:</strong></span> <span>${currentReceiptData.paymentDescription}</span></p>
+                                <p class="receipt-line"><span><strong>Ödeme Şekli:</strong></span> <span>${currentReceiptData.paymentMethod}</span></p>
+                            </div>
+                            <div class="receipt-total text-base font-bold text-gray-900">
+                                <p class="receipt-line"><span>Toplam Tutar:</span> <span>${currentReceiptData.paymentAmount.toFixed(2)} TL</span></p>
+                            </div>
+                            <p class="text-center text-xs text-gray-600 mt-2">Teşekkür ederiz!</p>
+                        </div>
+                    `;
+                    pdfPrintContainer.innerHTML += receiptContent;
                 }
-                window.print();
-            });
+
+                if (action === 'download') {
+                    const opt = {
+                        margin:       10,
+                        filename:     `makbuz_${currentReceiptData.id}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, logging: true, dpi: 192, letterRendering: true },
+                        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' } // A4 boyutunda dikey
+                    };
+                    html2pdf().set(opt).from(pdfPrintContainer).save();
+                } else if (action === 'print') {
+                    window.print();
+                }
+            }
+
+            downloadPdfButton.addEventListener('click', () => generatePdfAndOrPrint('download'));
+            printButton.addEventListener('click', () => generatePdfAndOrPrint('print'));
+
 
             // Tüm Ödemeler Butonu
             allPaymentsButton.addEventListener('click', () => {
@@ -710,6 +801,12 @@
 
             // Ödeme Kayıtlarını Sil Butonu (Ayarlar modalı içinde)
             clearPaymentsButton.addEventListener('click', () => {
+                const enteredPassword = prompt("Tüm ödeme kayıtlarını silmek için şifreyi girin:");
+                if (enteredPassword !== clearPassword) {
+                    alert("Yanlış şifre! Kayıtlar silinemedi.");
+                    return;
+                }
+
                 if (confirm('Tüm ödeme kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
                     payments = []; // Diziyi sıfırla
                     loadRecentPayments(); // Ana sayfadaki listeyi güncelle
