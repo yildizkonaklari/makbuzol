@@ -237,33 +237,21 @@
     <div class="container bg-white p-10 rounded-lg shadow-xl w-full max-w-4xl">
         <h1 id="mainTitle" class="text-3xl font-bold text-gray-800 mb-6">Makbuz Oluşturma Sistemi</h1>
 
-        <!-- Başlık Oluşturma Alanı -->
-        <div class="mb-8 p-4 bg-blue-50 rounded-md shadow-sm">
-            <h2 class="text-xl font-semibold text-blue-800 mb-3">Başlık Oluştur</h2>
-            <div class="flex flex-col sm:flex-row gap-3">
-                <input type="text" id="customTitleInput" placeholder="Makbuz Başlığını Buraya Girin" class="flex-grow p-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <button id="setCustomTitleButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">Başlığı Ayarla</button>
-            </div>
-        </div>
-
         <!-- Ana İşlem Butonları -->
         <div class="btn-group mb-8">
-            <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+            <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 hidden">
                 Ödeme Ekle
             </button>
             <button id="allPaymentsButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
                 Tüm Ödemeler
             </button>
-            <button id="monthlyReportButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
-                Aylık Rapor
-            </button>
-            <button id="clearPaymentsButton" class="btn-danger bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
-                Ödeme Kayıtlarını Sil
+            <button id="settingsButton" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
+                Ayarlar
             </button>
         </div>
 
         <!-- Ödeme Ekleme Formu -->
-        <div id="paymentForm" class="hidden bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
+        <div id="paymentForm" class="bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
             <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -304,15 +292,35 @@
         </div>
     </div>
 
-    <!-- Tüm Ödemeler ve Aylık Rapor Modalı -->
+    <!-- Tüm Ödemeler Modalı (Eski "Tüm Ödemeler ve Raporlar" modalının sadece ödemeler kısmı) -->
     <div id="allPaymentsModal" class="modal hidden">
         <div class="modal-content">
-            <button class="modal-close-button" id="closeModalButton">&times;</button>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Tüm Ödemeler ve Raporlar</h2>
+            <button class="modal-close-button" id="closeAllPaymentsModalButton">&times;</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Tüm Ödeme Kayıtları</h2>
+            <div id="allPaymentsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <p id="noAllPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ayarlar Modalı -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close-button" id="closeSettingsModalButton">&times;</button>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ayarlar</h2>
+
+            <!-- Başlık Oluşturma Alanı -->
+            <div class="mb-8 p-4 bg-blue-50 rounded-md shadow-sm">
+                <h3 class="text-xl font-semibold text-blue-800 mb-3">Makbuz Başlığı Oluştur</h3>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="customTitleInput" placeholder="Makbuz Başlığını Buraya Girin" class="flex-grow p-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <button id="setCustomTitleButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">Başlığı Ayarla</button>
+                </div>
+            </div>
 
             <!-- Aylık Rapor Kontrolleri -->
             <div class="mb-6 p-4 bg-yellow-50 rounded-md shadow-sm">
-                <h3 class="text-xl font-semibold text-yellow-800 mb-3">Aylık Rapor Oluştur</h3>
+                <h3 class="text-xl font-semibold text-yellow-800 mb-3">Aylık Rapor Al</h3>
                 <div class="flex flex-col sm:flex-row gap-3 items-center">
                     <select id="reportMonth" class="p-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 flex-grow">
                         <!-- Aylar JavaScript ile doldurulacak -->
@@ -327,10 +335,12 @@
                 </div>
             </div>
 
-            <!-- Tüm Ödemeler Listesi -->
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Tüm Ödeme Kayıtları</h3>
-            <div id="allPaymentsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <p id="noAllPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
+            <!-- Ödeme Kayıtlarını Sil Butonu -->
+            <div class="mb-6 p-4 bg-red-50 rounded-md shadow-sm">
+                <h3 class="text-xl font-semibold text-red-800 mb-3">Ödeme Kayıtlarını Sil</h3>
+                <button id="clearPaymentsButton" class="btn-danger bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full">
+                    Tüm Ödeme Kayıtlarını Sil
+                </button>
             </div>
         </div>
     </div>
@@ -347,8 +357,7 @@
             const setCustomTitleButton = document.getElementById('setCustomTitleButton');
             const addPaymentButton = document.getElementById('addPaymentButton');
             const allPaymentsButton = document.getElementById('allPaymentsButton');
-            const monthlyReportButton = document.getElementById('monthlyReportButton');
-            const clearPaymentsButton = document.getElementById('clearPaymentsButton');
+            const settingsButton = document.getElementById('settingsButton'); // Yeni ayarlar butonu
             const paymentForm = document.getElementById('paymentForm');
             const savePaymentButton = document.getElementById('savePaymentButton');
             const cancelPaymentButton = document.getElementById('cancelPaymentButton');
@@ -362,13 +371,17 @@
             const newPaymentButton = document.getElementById('newPaymentButton');
 
             const allPaymentsModal = document.getElementById('allPaymentsModal');
-            const closeModalButton = document.getElementById('closeModalButton');
+            const closeAllPaymentsModalButton = document.getElementById('closeAllPaymentsModalButton'); // Tüm ödemeler modalı kapatma
             const allPaymentsList = document.getElementById('allPaymentsList');
             const noAllPaymentsMessage = document.getElementById('noAllPaymentsMessage');
+            
+            const settingsModal = document.getElementById('settingsModal'); // Yeni ayarlar modalı
+            const closeSettingsModalButton = document.getElementById('closeSettingsModalButton'); // Ayarlar modalı kapatma
             const reportMonthSelect = document.getElementById('reportMonth');
             const reportYearSelect = document.getElementById('reportYear');
             const generateReportButton = document.getElementById('generateReportButton');
             const monthlyReportOutput = document.getElementById('monthlyReportOutput');
+            const clearPaymentsButton = document.getElementById('clearPaymentsButton'); // Ayarlar modalına taşındı
 
             // Başlık ayarla
             setCustomTitleButton.addEventListener('click', () => {
@@ -567,12 +580,10 @@
             allPaymentsButton.addEventListener('click', () => {
                 allPaymentsModal.classList.remove('hidden');
                 loadAllPayments();
-                populateMonthYearSelectors(); // Modal açıldığında seçicileri doldur
-                monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
             });
 
-            // Modalı kapat
-            closeModalButton.addEventListener('click', () => {
+            // Tüm Ödemeler Modalı kapatma
+            closeAllPaymentsModalButton.addEventListener('click', () => {
                 allPaymentsModal.classList.add('hidden');
             });
 
@@ -597,12 +608,17 @@
                 }
             }
 
-            // Aylık rapor butonuna basınca modalı aç ve rapor kontrollerini göster
-            monthlyReportButton.addEventListener('click', () => {
-                allPaymentsModal.classList.remove('hidden');
+            // Ayarlar Butonu
+            settingsButton.addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+                // Ayarlar modalı açıldığında aylık rapor seçicilerini doldur
                 populateMonthYearSelectors();
-                allPaymentsList.innerHTML = '<p class="col-span-full text-center text-gray-500">Aylık raporu görmek için yukarıdaki seçenekleri kullanın.</p>';
-                noAllPaymentsMessage.classList.add('hidden');
+                monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
+            });
+
+            // Ayarlar Modalı kapatma
+            closeSettingsModalButton.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
             });
 
             // Ay ve Yıl Seçicilerini Doldur
@@ -635,18 +651,18 @@
                 reportMonthSelect.value = new Date().getMonth(); // Mevcut ayı seçili yap
             }
 
-            // Rapor Oluştur Butonu
+            // Rapor Oluştur Butonu (Ayarlar modalı içinde)
             generateReportButton.addEventListener('click', () => {
                 const selectedMonth = parseInt(reportMonthSelect.value);
                 const selectedYear = parseInt(reportYearSelect.value);
 
-                // Seçeneklerin varlığını kontrol et
-                if (reportMonthSelect.options[reportMonthSelect.selectedIndex] === undefined) {
+                // Seçeneklerin varlığını ve geçerliliğini kontrol et
+                if (isNaN(selectedMonth) || isNaN(selectedYear) || reportMonthSelect.options.length === 0) {
                     monthlyReportOutput.innerHTML = `<p class="text-red-600">Ay veya yıl seçimi geçersiz. Lütfen tekrar deneyin.</p>`;
                     monthlyReportOutput.classList.remove('hidden');
                     return;
                 }
-
+                
                 const filteredPayments = payments.filter(payment => {
                     const paymentDate = payment.fullDate;
                     return paymentDate.getMonth() === selectedMonth && paymentDate.getFullYear() === selectedYear;
@@ -670,7 +686,7 @@
                 monthlyReportOutput.classList.remove('hidden');
             });
 
-            // Ödeme Kayıtlarını Sil Butonu
+            // Ödeme Kayıtlarını Sil Butonu (Ayarlar modalı içinde)
             clearPaymentsButton.addEventListener('click', () => {
                 if (confirm('Tüm ödeme kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
                     payments = []; // Diziyi sıfırla
