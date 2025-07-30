@@ -420,6 +420,30 @@
         // Global variable to store the payment data for the currently displayed receipt
         let currentReceiptForShare = null;
 
+        // Receipt numbering logic
+        let lastReceiptNumber = parseInt(localStorage.getItem('lastReceiptNumber')) || 999; // Start from 999 so first is 1000
+        let lastReceiptMonthYear = localStorage.getItem('lastReceiptMonthYear') || '';
+
+        function generateReceiptId() {
+            const today = new Date();
+            const currentMonthYear = `${today.getMonth()}-${today.getFullYear()}`;
+
+            if (currentMonthYear !== lastReceiptMonthYear) {
+                // New month, reset to 1000
+                lastReceiptNumber = 1000;
+                lastReceiptMonthYear = currentMonthYear;
+            } else {
+                // Same month, increment
+                lastReceiptNumber++;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('lastReceiptNumber', lastReceiptNumber.toString());
+            localStorage.setItem('lastReceiptMonthYear', lastReceiptMonthYear);
+
+            return lastReceiptNumber;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const mainTitle = document.getElementById('mainTitle');
             const customTitleInput = document.getElementById('customTitleInput');
@@ -546,7 +570,7 @@
                 }
 
                 const paymentData = {
-                    id: Date.now(), // Benzersiz ID
+                    id: generateReceiptId(), // Benzersiz ID için yeni fonksiyonu kullan
                     payerName,
                     childName: childName || 'Belirtilmedi',
                     paymentDescription: paymentDescription || 'Yok',
@@ -677,10 +701,13 @@
                         margin:       10,
                         filename:     `makbuz_${paymentData.id}.pdf`,
                         image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, logging: true, dpi: 192, letterRendering: true },
+                        html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true }, // DPI artırıldı
                         jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' } // A5 boyutunda dikey
                     };
                     
+                    // Küçük bir gecikme ekle
+                    await new Promise(resolve => setTimeout(resolve, 50)); 
+
                     await html2pdf().set(opt).from(tempDiv).save();
                     document.body.removeChild(tempDiv); // Kaydettikten sonra kaldır
 
