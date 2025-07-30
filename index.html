@@ -54,7 +54,7 @@
 
         textarea {
             resize: vertical; /* Sadece dikey yeniden boyutlandırma */
-            min-height: 10rem; /* Minimum yükseklik artırıldı */
+            /* min-height kaldırıldı, rows özniteliği kontrol edecek */
         }
 
         button {
@@ -214,10 +214,65 @@
             color: #1f2937;
         }
 
+        /* PDF İçin Özel Konteyner Stilleri */
+        #pdfPrintContainer {
+            position: absolute;
+            left: -9999px; /* Ekran dışında konumlandır */
+            top: -9999px;
+            width: 210mm; /* A4 genişliği */
+            height: 297mm; /* A4 yüksekliği */
+            padding: 10mm; /* Kenar boşlukları */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around; /* Makbuzları dikeyde eşit dağıt */
+            align-items: center;
+            z-index: -1; /* Diğer içeriğin altında kalmasını sağla */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf {
+            width: 100%;
+            max-width: 148mm; /* Yaklaşık A5 genişliği */
+            border: 1px dashed #9ca3af;
+            padding: 10mm;
+            margin-bottom: 5mm; /* İki makbuz arası boşluk */
+            box-sizing: border-box;
+            page-break-inside: avoid; /* Makbuzun ortadan bölünmemesini sağlar */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf:last-child {
+            margin-bottom: 0;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf h3 {
+            font-size: 1.2rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf p {
+            font-size: 0.8rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf .receipt-total {
+            font-size: 0.9rem;
+        }
+
+
         /* Yazdırma için özel stil */
         @media print {
             body * {
                 visibility: hidden;
+            }
+            /* Sadece PDF konteynerini yazdır */
+            #pdfPrintContainer, #pdfPrintContainer * {
+                visibility: visible;
+            }
+            #pdfPrintContainer {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 210mm;
+                height: 297mm;
+                padding: 0;
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-around;
+                align-items: center;
             }
             .no-print {
                 display: none;
@@ -247,7 +302,7 @@
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
             <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <textarea id="paymentDescription" placeholder="Ödeme Açıklaması" rows="6" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            <textarea id="paymentDescription" placeholder="Ödeme Açıklaması" rows="2" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             <select id="paymentMethod" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -341,7 +396,7 @@
             <button class="modal-close-button" id="closeShareOptionsModalButton">&times;</button>
             <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Makbuzu Paylaş</h2>
             <div class="btn-group flex-col">
-                <!-- PDF Olarak İndir butonu kaldırıldı -->
+                <button id="shareModalDownloadPdfButton" class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">PDF Olarak İndir</button>
                 <button id="shareModalWhatsappButton" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">WhatsApp ile Paylaş (Metin)</button>
                 <button id="shareModalMailButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">E-posta ile Paylaş</button>
                 <button id="shareModalPrintButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full">Yazdır</button>
@@ -349,7 +404,8 @@
         </div>
     </div>
 
-    <!-- PDF oluşturmak için gizli konteyner tamamen kaldırıldı -->
+    <!-- PDF oluşturmak için gizli konteyner -->
+    <div id="pdfPrintContainer" class="hidden"></div>
 
     <script>
         // Ödemeleri geçici olarak saklayacak dizi
@@ -420,12 +476,12 @@
 
             const shareOptionsModal = document.getElementById('shareOptionsModal'); // Paylaşım seçenekleri modalı
             const closeShareOptionsModalButton = document.getElementById('closeShareOptionsModalButton');
-            // const shareModalDownloadPdfButton = document.getElementById('shareModalDownloadPdfButton'); // Kaldırıldı
+            const shareModalDownloadPdfButton = document.getElementById('shareModalDownloadPdfButton'); // Tekrar eklendi
             const shareModalWhatsappButton = document.getElementById('shareModalWhatsappButton');
             const shareModalMailButton = document.getElementById('shareModalMailButton');
             const shareModalPrintButton = document.getElementById('shareModalPrintButton');
 
-            // const pdfPrintContainer = document.getElementById('pdfPrintContainer'); // Kaldırıldı
+            const pdfPrintContainer = document.getElementById('pdfPrintContainer'); // Tekrar eklendi
 
             // Sayfa yüklendiğinde tüm modalları ve aksiyon alanlarını gizle
             allPaymentsModal.classList.add('hidden');
@@ -596,7 +652,7 @@
                 `;
             }
 
-            // Function to generate receipt HTML for printing
+            // Function to generate receipt HTML for PDF/Print
             function getReceiptHtmlContent(payment) {
                 return `
                     <div class="receipt-item-for-pdf">
@@ -624,45 +680,76 @@
                 `;
             }
 
-            // Function to handle printing the receipt
-            async function handlePrintReceipt(paymentData) {
+            // Function to handle PDF generation and printing
+            async function generatePdfAndOrPrint(action, paymentData) {
                 if (!paymentData) {
-                    alert('Yazdırılacak bir makbuz bulunmuyor.');
+                    alert('PDF oluşturulacak veya yazdırılacak bir makbuz bulunmuyor.');
                     return;
                 }
 
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>Makbuz Yazdır</title>');
-                // Tailwind CSS ve özel stilleri kopyala
-                printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
-                printWindow.document.write('<style>');
-                printWindow.document.write(`
-                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-                    body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
-                    .receipt-item-for-pdf {
-                        width: 148mm; /* A5 width to fit two on A4 */
-                        border: 1px dashed #9ca3af;
-                        padding: 10mm;
-                        margin-bottom: 10mm; /* Space between receipts */
-                        box-sizing: border-box;
-                        page-break-inside: avoid;
+                if (action === 'download') {
+                    // Populate the hidden container with receipt content
+                    pdfPrintContainer.innerHTML = getReceiptHtmlContent(paymentData);
+                    // Temporarily make it visible for html2pdf to capture
+                    pdfPrintContainer.classList.remove('hidden'); 
+
+                    const opt = {
+                        margin:       10,
+                        filename:     `makbuz_${paymentData.id}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
+                        jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
+                    };
+                    
+                    // Add a small delay to ensure the content is rendered by the browser
+                    await new Promise(resolve => setTimeout(resolve, 100)); 
+
+                    try {
+                        await html2pdf().set(opt).from(pdfPrintContainer).save();
+                    } catch (error) {
+                        console.error("PDF oluşturulurken hata oluştu:", error);
+                        alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
+                    } finally {
+                        // Hide the container again
+                        pdfPrintContainer.classList.add('hidden'); 
+                        pdfPrintContainer.innerHTML = ''; // Clear content
                     }
-                    .receipt-item-for-pdf:last-child { margin-bottom: 0; }
-                    .receipt-item-for-pdf h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
-                    .receipt-item-for-pdf p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
-                    .receipt-item-for-pdf .receipt-line { display: flex; justify-content: space-between; }
-                    .receipt-item-for-pdf .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
-                    .receipt-item-for-pdf .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
-                `);
-                printWindow.document.write('</style>');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write(getReceiptHtmlContent(paymentData));
-                printWindow.document.write(getReceiptHtmlContent(paymentData)); // İkinci kopya
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-                // printWindow.close(); // Bazı tarayıcılarda yazdırmayı engelleyebilir
+
+                } else if (action === 'print') {
+                    // İki adet makbuz içeriği oluştur (A4'e sığacak şekilde)
+                    const printWindow = window.open('', '_blank');
+                    printWindow.document.write('<html><head><title>Makbuz Yazdır</title>');
+                    // Tailwind CSS ve özel stilleri kopyala
+                    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
+                    printWindow.document.write('<style>');
+                    printWindow.document.write(`
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
+                        .receipt-item-for-pdf {
+                            width: 148mm; /* A5 width to fit two on A4 */
+                            border: 1px dashed #9ca3af;
+                            padding: 10mm;
+                            margin-bottom: 10mm; /* Space between receipts */
+                            box-sizing: border-box;
+                            page-break-inside: avoid;
+                        }
+                        .receipt-item-for-pdf:last-child { margin-bottom: 0; }
+                        .receipt-item-for-pdf h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
+                        .receipt-item-for-pdf p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
+                        .receipt-item-for-pdf .receipt-line { display: flex; justify-content: space-between; }
+                        .receipt-item-for-pdf .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
+                        .receipt-item-for-pdf .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
+                    `);
+                    printWindow.document.write('</style>');
+                    printWindow.document.write('</head><body>');
+                    printWindow.document.write(getReceiptHtmlContent(paymentData));
+                    printWindow.document.write(getReceiptHtmlContent(paymentData)); // İkinci kopya
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    printWindow.print();
+                    // printWindow.close(); // Bazı tarayıcılarda yazdırmayı engelleyebilir
+                }
             }
 
             // WhatsApp ile paylaş (metin olarak)
@@ -726,10 +813,10 @@
             });
 
             // Paylaşım modalındaki butonlar
-            // shareModalDownloadPdfButton.addEventListener('click', () => { // Kaldırıldı
-            //     generatePdfAndOrPrint('download', currentReceiptForShare);
-            //     shareOptionsModal.classList.add('hidden');
-            // });
+            shareModalDownloadPdfButton.addEventListener('click', () => { // Tekrar eklendi
+                generatePdfAndOrPrint('download', currentReceiptForShare);
+                shareOptionsModal.classList.add('hidden');
+            });
 
             shareModalWhatsappButton.addEventListener('click', () => {
                 const confirmTextShare = confirm("WhatsApp üzerinden doğrudan PDF dosyası gönderilememektedir. Makbuz bilgilerini metin olarak paylaşmak ister misiniz?");
@@ -745,7 +832,7 @@
             });
 
             shareModalPrintButton.addEventListener('click', () => {
-                handlePrintReceipt(currentReceiptForShare); // Fonksiyon adı güncellendi
+                generatePdfAndOrPrint('print', currentReceiptForShare); // Fonksiyon adı güncellendi
                 shareOptionsModal.classList.add('hidden');
             });
 
