@@ -104,7 +104,7 @@
         }
 
         .hidden {
-            display: none !important; /* !important eklendi */
+            display: none; /* !important kaldırıldı */
         }
 
         .payment-item {
@@ -214,11 +214,10 @@
             color: #1f2937;
         }
 
-        /* PDF İçin Özel Konteyner Stilleri */
+        /* PDF İçin Özel Konteyner Stilleri (Artık hidden değil, sadece ekran dışında) */
         #pdfPrintContainer {
-            /* Ekran dışında konumlandır, ancak display:none yapma */
             position: absolute;
-            left: -9999px;
+            left: -9999px; /* Ekran dışında konumlandır */
             top: -9999px;
             width: 210mm; /* A4 genişliği */
             height: 297mm; /* A4 yüksekliği */
@@ -258,7 +257,8 @@
             body * {
                 visibility: hidden;
             }
-            #pdfPrintContainer, #pdfPrintContainer * { /* Sadece PDF konteynerini yazdır */
+            /* Sadece PDF konteynerini yazdır */
+            #pdfPrintContainer, #pdfPrintContainer * {
                 visibility: visible;
             }
             #pdfPrintContainer {
@@ -629,7 +629,7 @@
             }
 
             // Function to generate receipt HTML for PDF/Print
-            function getReceiptHtmlForPdf(payment) {
+            function getReceiptHtmlContent(payment) {
                 return `
                     <div class="receipt-item-for-pdf">
                         <h3 class="text-center font-bold mb-2 text-gray-800">${customTitle}</h3>
@@ -657,18 +657,22 @@
             }
 
             // Function to handle PDF generation and printing
-            function generatePdfAndOrPrint(action, paymentData) {
+            async function generatePdfAndOrPrint(action, paymentData) {
                 if (!paymentData) {
                     alert('PDF oluşturulacak veya yazdırılacak bir makbuz bulunmuyor.');
                     return;
                 }
 
-                // PDF konteynerini temizle
-                pdfPrintContainer.innerHTML = '';
-
                 if (action === 'download') {
                     // Tek A5 makbuz için
-                    pdfPrintContainer.innerHTML = getReceiptHtmlForPdf(paymentData);
+                    // Geçici bir div oluştur ve makbuz içeriğini içine ekle
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = getReceiptHtmlContent(paymentData);
+                    // tempDiv'i görünmez ama DOM'da var olacak şekilde ekle
+                    tempDiv.style.position = 'absolute';
+                    tempDiv.style.left = '-9999px';
+                    document.body.appendChild(tempDiv);
+
                     const opt = {
                         margin:       10,
                         filename:     `makbuz_${paymentData.id}.pdf`,
@@ -676,13 +680,44 @@
                         html2canvas:  { scale: 2, logging: true, dpi: 192, letterRendering: true },
                         jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' } // A5 boyutunda dikey
                     };
-                    html2pdf().set(opt).from(pdfPrintContainer).save();
+                    
+                    await html2pdf().set(opt).from(tempDiv).save();
+                    document.body.removeChild(tempDiv); // Kaydettikten sonra kaldır
+
                 } else if (action === 'print') {
                     // İki adet makbuz içeriği oluştur (A4'e sığacak şekilde)
-                    for (let i = 0; i < 2; i++) {
-                        pdfPrintContainer.innerHTML += getReceiptHtmlForPdf(paymentData);
-                    }
-                    window.print();
+                    const printWindow = window.open('', '_blank');
+                    printWindow.document.write('<html><head><title>Makbuz Yazdır</title>');
+                    // Tailwind CSS ve özel stilleri kopyala
+                    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
+                    printWindow.document.write('<style>');
+                    printWindow.document.write(`
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
+                        .receipt-item-for-pdf {
+                            width: 148mm; /* A5 width to fit two on A4 */
+                            border: 1px dashed #9ca3af;
+                            padding: 10mm;
+                            margin-bottom: 10mm; /* Space between receipts */
+                            box-sizing: border-box;
+                            page-break-inside: avoid;
+                        }
+                        .receipt-item-for-pdf:last-child { margin-bottom: 0; }
+                        .receipt-item-for-pdf h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
+                        .receipt-item-for-pdf p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
+                        .receipt-item-for-pdf .receipt-line { display: flex; justify-content: space-between; }
+                        .receipt-item-for-pdf .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
+                        .receipt-item-for-pdf .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
+                    `);
+                    printWindow.document.write('</style>');
+                    printWindow.document.write('</head><body>');
+                    printWindow.document.write(getReceiptHtmlContent(paymentData));
+                    printWindow.document.write(getReceiptHtmlContent(paymentData)); // İkinci kopya
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    printWindow.print();
+                    // printWindow.close(); // Bazı tarayıcılarda yazdırmayı engelleyebilir
                 }
             }
 
