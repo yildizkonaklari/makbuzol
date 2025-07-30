@@ -228,6 +228,8 @@
             justify-content: space-around; /* Makbuzları dikeyde eşit dağıt */
             align-items: center;
             z-index: -1; /* Diğer içeriğin altında kalmasını sağla */
+            visibility: hidden; /* HTML2PDF'in yakalaması için gizli ama render edilebilir */
+            opacity: 0; /* Tamamen şeffaf */
         }
         #pdfPrintContainer .receipt-item-for-pdf {
             width: 100%;
@@ -406,7 +408,7 @@
     </div>
 
     <!-- PDF oluşturmak için gizli konteyner -->
-    <div id="pdfPrintContainer" class="hidden"></div>
+    <div id="pdfPrintContainer"></div>
 
     <script>
         // Ödemeleri geçici olarak saklayacak dizi
@@ -692,7 +694,8 @@
                     // Populate the hidden container with receipt content
                     pdfPrintContainer.innerHTML = getReceiptHtmlContent(paymentData);
                     // Temporarily make it visible for html2pdf to capture
-                    pdfPrintContainer.classList.remove('hidden'); 
+                    pdfPrintContainer.style.visibility = 'visible';
+                    pdfPrintContainer.style.opacity = '1';
 
                     const opt = {
                         margin:       10,
@@ -711,9 +714,10 @@
                         console.error("PDF oluşturulurken hata oluştu:", error);
                         alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
                     } finally {
-                        // Hide the container again
-                        pdfPrintContainer.classList.add('hidden'); 
-                        pdfPrintContainer.innerHTML = ''; // Clear content
+                        // Hide the container again and clear content
+                        pdfPrintContainer.style.visibility = 'hidden';
+                        pdfPrintContainer.style.opacity = '0';
+                        pdfPrintContainer.innerHTML = '';
                     }
 
                 } else if (action === 'print') {
@@ -744,7 +748,7 @@
                     printWindow.document.write('</style>');
                     printWindow.document.write('</head><body>');
                     printWindow.document.write(getReceiptHtmlContent(paymentData));
-                    printWindow.document.write(getReceiptHtmlContent(paymentData)); // İkinci kopya
+                    // printWindow.document.write(getReceiptHtmlContent(paymentData)); // İkinci kopya kaldırıldı
                     printWindow.document.write('</body></html>');
                     printWindow.document.close();
                     printWindow.focus();
@@ -824,11 +828,6 @@
 
 
             // Paylaşım modalındaki butonlar
-            // shareModalDownloadPdfButton.addEventListener('click', () => { // Bu buton artık ana sayfada
-            //     generatePdfAndOrPrint('download', currentReceiptForShare);
-            //     shareOptionsModal.classList.add('hidden');
-            // });
-
             shareModalWhatsappButton.addEventListener('click', () => {
                 const confirmTextShare = confirm("WhatsApp üzerinden doğrudan PDF dosyası gönderilememektedir. Makbuz bilgilerini metin olarak paylaşmak ister misiniz?");
                 if (confirmTextShare) {
