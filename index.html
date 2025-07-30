@@ -692,14 +692,13 @@
                     // Geçici bir div oluştur ve makbuz içeriğini içine ekle
                     const tempDiv = document.createElement('div');
                     // tempDiv'i görünmez ama DOM'da var olacak şekilde ekle
-                    tempDiv.style.position = 'fixed';
-                    tempDiv.style.top = '0';
-                    tempDiv.style.left = '0';
-                    tempDiv.style.width = '100vw'; 
-                    tempDiv.style.height = '100vh'; 
-                    tempDiv.style.opacity = '0'; 
-                    tempDiv.style.zIndex = '-1'; 
-                    tempDiv.style.overflow = 'hidden'; 
+                    // Bu stil, öğeyi ekran dışında tutarken yine de render edilmesini sağlar.
+                    tempDiv.style.position = 'absolute';
+                    tempDiv.style.left = '-9999px';
+                    tempDiv.style.top = '-9999px';
+                    tempDiv.style.width = '210mm'; // A4 genişliği, içeriğin yeterli alana sahip olduğundan emin olmak için
+                    tempDiv.style.height = '297mm'; // A4 yüksekliği
+                    tempDiv.style.overflow = 'hidden'; // Kaydırma çubuklarını önle
                     tempDiv.innerHTML = getReceiptHtmlContent(paymentData);
                     document.body.appendChild(tempDiv);
 
@@ -711,16 +710,18 @@
                         jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' } // A5 boyutunda dikey
                     };
                     
-                    // Küçük bir gecikme ekle
+                    // Küçük bir gecikme ekle, tarayıcının öğeyi render etmesi için zaman tanı
                     await new Promise(resolve => setTimeout(resolve, 100)); 
 
                     try {
+                        // html2pdf, tempDiv'deki içeriği yakalayacak
                         await html2pdf().set(opt).from(tempDiv).save();
                     } catch (error) {
                         console.error("PDF oluşturulurken hata oluştu:", error);
                         alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
                     } finally {
-                        document.body.removeChild(tempDiv); // Her durumda kaldır
+                        // Geçici div'i DOM'dan kaldır
+                        document.body.removeChild(tempDiv); 
                     }
 
                 } else if (action === 'print') {
