@@ -691,10 +691,16 @@
                     // Tek A5 makbuz için
                     // Geçici bir div oluştur ve makbuz içeriğini içine ekle
                     const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = getReceiptHtmlContent(paymentData);
                     // tempDiv'i görünmez ama DOM'da var olacak şekilde ekle
-                    tempDiv.style.position = 'absolute';
-                    tempDiv.style.left = '-9999px';
+                    tempDiv.style.position = 'fixed';
+                    tempDiv.style.top = '0';
+                    tempDiv.style.left = '0';
+                    tempDiv.style.width = '100vw'; 
+                    tempDiv.style.height = '100vh'; 
+                    tempDiv.style.opacity = '0'; 
+                    tempDiv.style.zIndex = '-1'; 
+                    tempDiv.style.overflow = 'hidden'; 
+                    tempDiv.innerHTML = getReceiptHtmlContent(paymentData);
                     document.body.appendChild(tempDiv);
 
                     const opt = {
@@ -706,10 +712,16 @@
                     };
                     
                     // Küçük bir gecikme ekle
-                    await new Promise(resolve => setTimeout(resolve, 50)); 
+                    await new Promise(resolve => setTimeout(resolve, 100)); 
 
-                    await html2pdf().set(opt).from(tempDiv).save();
-                    document.body.removeChild(tempDiv); // Kaydettikten sonra kaldır
+                    try {
+                        await html2pdf().set(opt).from(tempDiv).save();
+                    } catch (error) {
+                        console.error("PDF oluşturulurken hata oluştu:", error);
+                        alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
+                    } finally {
+                        document.body.removeChild(tempDiv); // Her durumda kaldır
+                    }
 
                 } else if (action === 'print') {
                     // İki adet makbuz içeriği oluştur (A4'e sığacak şekilde)
