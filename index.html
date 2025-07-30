@@ -104,7 +104,7 @@
         }
 
         .hidden {
-            display: none; /* !important kaldırıldı */
+            display: none !important; /* !important tekrar eklendi */
         }
 
         .payment-item {
@@ -459,6 +459,19 @@
 
             const pdfPrintContainer = document.getElementById('pdfPrintContainer'); // PDF için gizli konteyner
 
+            // Sayfa yüklendiğinde tüm modalları ve aksiyon alanlarını gizle
+            allPaymentsModal.classList.add('hidden');
+            settingsModal.classList.add('hidden');
+            receiptActions.classList.add('hidden');
+            receiptDisplay.classList.add('hidden');
+            shareOptionsModal.classList.add('hidden');
+            
+            // Sadece ödeme formunu göster
+            paymentForm.classList.remove('hidden'); 
+            addPaymentButton.classList.add('hidden'); 
+            
+            loadRecentPayments(); // Son ödemeleri de yükle
+
             // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
             function showSection(sectionId) {
                 // Tüm ana içerik alanlarını gizle
@@ -479,19 +492,6 @@
                     addPaymentButton.classList.remove('hidden'); // Diğer bölümler açıksa göster
                 }
             }
-
-            // Sayfa yüklendiğinde varsayılan olarak ödeme formunu göster
-            // Tüm modal öğelerinin başlangıçta gizli olduğundan emin ol
-            allPaymentsModal.classList.add('hidden');
-            settingsModal.classList.add('hidden');
-            receiptActions.classList.add('hidden');
-            receiptDisplay.classList.add('hidden');
-            shareOptionsModal.classList.add('hidden'); // Başlangıçta paylaşım modalını gizle
-            
-            paymentForm.classList.remove('hidden'); // Ödeme formunu başlangıçta göster
-            addPaymentButton.classList.add('hidden'); // Ödeme ekle butonunu başlangıçta gizle
-            
-            loadRecentPayments(); // Son ödemeleri de yükle
 
             // Başlık ayarla
             setCustomTitleButton.addEventListener('click', () => {
