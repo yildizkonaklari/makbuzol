@@ -7,20 +7,23 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Firebase SDK v11.6.1 -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
         // Firebase yapılandırması doğrudan buraya eklendi
-        const firebaseConfig = {
-            apiKey: "AIzaSyDx6buFRmcq8Llrf_YgMBelYvj19TIuSWs",
-            authDomain: "makbuz-ver.firebaseapp.com",
-            projectId: "makbuz-ver",
-            storageBucket: "makbuz-ver.firebasestorage.app",
-            messagingSenderId: "764022579482",
-            appId: "1:764022579482:web:60748b0e628e3d9f468ca3"
-        };
-        
+  const firebaseConfig = {
+    apiKey: "AIzaSyDx6buFRmcq8Llrf_YgMBelYvj19TIuSWs",
+    authDomain: "makbuz-ver.firebaseapp.com",
+    projectId: "makbuz-ver",
+    storageBucket: "makbuz-ver.firebasestorage.app",
+    messagingSenderId: "764022579482",
+    appId: "1:764022579482:web:1265440a354bbc72468ca3"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
         // Canvas ortamından gelen global değişkenler
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // projectId'yi varsayılan appId olarak kullan
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
