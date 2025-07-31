@@ -1,87 +1,16 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Makbuz Oluşturma Sistemi</title>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <!-- Stil -->
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f3f3f3;
-      margin: 0;
-      padding: 1rem;
-    }
-    .container {
-      max-width: 480px;
-      margin: auto;
-      background: white;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px #ccc;
-    }
-    input, select, textarea, button {
-      width: 100%;
-      margin-top: 0.5rem;
-      margin-bottom: 1rem;
-      padding: 0.7rem;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-    }
-    button {
-      background: #1976d2;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    #receiptPreview, #shareModal {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #e6f4ea;
-      border: 1px solid #c7dec7;
-      border-radius: 5px;
-    }
-    .hidden {
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <main class="container">
-    <h2>Makbuz Oluştur</h2>
-    <form id="receiptForm">
-      <input type="text" name="payerName" placeholder="Ödeme Yapan (Ad Soyad)" required />
-      <input type="text" name="childName" placeholder="Çocuk (Ad Soyad)" required />
-      <input type="tel" name="phone" placeholder="Telefon Numarası" required />
-      <textarea name="description" placeholder="Açıklama"></textarea>
-      <input type="number" name="amount" placeholder="Ödeme Tutarı (TL)" required />
-      <select name="paymentType">
-        <option value="nakit">Nakit</option>
-        <option value="kredi_karti">Kredi Kartı</option>
-      </select>
-      <button type="submit">Makbuz Oluştur</button>
-    </form>
+// Gerekli bağımlılıklar:
+// npm install react-router-dom firebase jspdf html2canvas
 
-    <div id="receiptPreview" class="hidden">
-      <h3>Makbuz Önizleme</h3>
-      <div id="receiptContent"></div>
-      <button id="shareButton">Paylaş</button>
-    </div>
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
-    <div id="shareModal" class="hidden">
-      <button onclick="alert('PDF İndirilecek (gelecek özellik)')">📄 PDF indir</button>
-      <button id="sendWhatsapp">📱 WhatsApp Gönder</button>
-      <button onclick="alert('Eposta gönderme yakında eklenecek')">📧 E-posta</button>
-      <button onclick="window.print()">🖨️ Yazdır</button>
-    </div>
-  </main>
-
-  <!-- Firebase ve JS -->
-  <script>
-    // Firebase Yapılandırması (GİRİLECEK)
+// === BURAYA FIREBASE BİLGİLERİNİ GİRECEKSİNİZ ===
+// Bu alanı kendi Firebase projenize göre düzenlemeniz gerekiyor.
+// HTML'e aktarımda burası gizli tutulmalı veya dışarıdan yüklenmeli.
 const firebaseConfig = {
   apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
   authDomain: "makbuzum-5977c.firebaseapp.com",
@@ -90,51 +19,145 @@ const firebaseConfig = {
   messagingSenderId: "1011006092472",
   appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
 };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+// Tarayıcı destekli PDF oluşturmak için jsPDF kullanılmakta.
+// HTML versiyonda bu kütüphane <script> etiketi ile dışarıdan dahil etmelisiniz.
+// Aynı şekilde html2canvas da tarayıcıya uygun bir <script> etiketi ile HTML dosyasına dahil edilmelidir.
+initializeApp(firebaseConfig);
+const db = getFirestore();
 
-    // Makbuz numarası yönetimi (varsayılan başlangıç)
-    let receiptNumber = 1000;
+function formatDate(date) {
+  return new Date(date).toLocaleDateString("tr-TR");
+}
 
-    // Form gönderimi
-    document.getElementById("receiptForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const form = e.target;
-      const data = {
-        payerName: form.payerName.value,
-        childName: form.childName.value,
-        phone: form.phone.value,
-        description: form.description.value,
-        amount: parseFloat(form.amount.value),
-        paymentType: form.paymentType.value,
-        createdAt: new Date().toISOString(),
-        receiptNumber: receiptNumber++
-      };
+function generateReceiptNumber() {
+  const now = new Date();
+  const key = `counter_${now.getFullYear()}_${now.getMonth() + 1}`;
+  const count = parseInt(localStorage.getItem(key)) || 1000;
+  localStorage.setItem(key, count + 1);
+  return count;
+}
 
-      // Firebase'e Kaydet
-      await db.collection("makbuzlar").add(data);
+function Home() {
+  const [form, setForm] = useState({
+    name: "",
+    child: "",
+    phone: "",
+    note: "",
+    amount: "",
+    method: "nakit"
+  });
+  const [receipt, setReceipt] = useState(null);
 
-      // Makbuz Önizleme
-      document.getElementById("receiptContent").innerHTML = `
-        <p><strong>Makbuz No:</strong> ${data.receiptNumber}</p>
-        <p><strong>Ödeme Yapan:</strong> ${data.payerName}</p>
-        <p><strong>Çocuk:</strong> ${data.childName}</p>
-        <p><strong>Tutar:</strong> ${data.amount} TL</p>
-        <p><strong>Ödeme Türü:</strong> ${data.paymentType}</p>
-      `;
-      document.getElementById("receiptPreview").classList.remove("hidden");
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-      // Whatsapp butonuna telefon numarasını bağla
-      document.getElementById("sendWhatsapp").onclick = function () {
-        const msg = `Makbuz No: ${data.receiptNumber}\n${data.payerName} - ${data.amount} TL`;
-        window.open(`https://wa.me/${data.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`);
-      };
-    });
+  const handleSubmit = async () => {
+    const number = generateReceiptNumber();
+    const newReceipt = { ...form, number, date: Date.now() };
+    const docRef = await addDoc(collection(db, "receipts"), newReceipt);
+    setReceipt({ id: docRef.id, ...newReceipt });
+  };
 
-    // Paylaş butonuna basınca modal açılır
-    document.getElementById("shareButton").addEventListener("click", () => {
-      document.getElementById("shareModal").classList.remove("hidden");
-    });
-  </script>
-</body>
-</html>
+  const downloadPDF = async () => {
+    const element = document.getElementById("receipt");
+    const canvas = await html2canvas(element);
+    const img = canvas.toDataURL("image/png");
+    const pdf = new jsPDF();
+    pdf.addImage(img, "PNG", 10, 10, 190, 0);
+    pdf.save(`makbuz_${receipt.number}.pdf`);
+  };
+
+  return (
+    <div className="p-4 max-w-md mx-auto">
+      <h2 className="text-xl font-bold mb-2">Makbuz Ekle</h2>
+      <input name="name" placeholder="Ad Soyad" onChange={handleChange} className="input" />
+      <input name="child" placeholder="Çocuk Ad Soyad" onChange={handleChange} className="input" />
+      <input name="phone" placeholder="Telefon" onChange={handleChange} className="input" />
+      <input name="note" placeholder="Açıklama" onChange={handleChange} className="input" />
+      <input name="amount" placeholder="Tutar (TL)" onChange={handleChange} className="input" />
+      <select name="method" onChange={handleChange} className="input">
+        <option value="nakit">Nakit</option>
+        <option value="kredi kartı">Kredi Kartı</option>
+      </select>
+      <button onClick={handleSubmit} className="btn">Kaydet</button>
+
+      {receipt && (
+        <div id="receipt" className="border p-4 mt-4">
+          <h3 className="font-bold">Makbuz #{receipt.number}</h3>
+          <p>{receipt.name} - {receipt.child}</p>
+          <p>{receipt.phone}</p>
+          <p>{receipt.note}</p>
+          <p>{receipt.amount} TL ({receipt.method})</p>
+          <p>{formatDate(receipt.date)}</p>
+          <div className="mt-2">
+            <button onClick={downloadPDF} className="btn">Paylaş</button>
+            {/* Whatsapp, eposta, yazdır seçenekleri buraya eklenebilir */}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AllReceipts() {
+  const [list, setList] = useState([]);
+
+  const fetchReceipts = async () => {
+    const snapshot = await getDocs(collection(db, "receipts"));
+    setList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  };
+
+  useEffect(() => {
+    fetchReceipts();
+  }, []);
+
+  return (
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-2">Tüm Ödemeler</h2>
+      {list.map(r => (
+        <div key={r.id} className="border p-2 mb-2">
+          <p>#{r.number} - {r.name} - {r.amount} TL</p>
+          <p>{formatDate(r.date)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Settings() {
+  const clearReceipts = async () => {
+    const snapshot = await getDocs(collection(db, "receipts"));
+    snapshot.forEach(async (d) => await deleteDoc(doc(db, "receipts", d.id)));
+    alert("Tüm makbuzlar silindi");
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">Ayarlar</h2>
+      <button onClick={clearReceipts} className="btn">Tüm Ödemeleri Sil</button>
+      {/* Aylık PDF indirme özelliği buraya eklenebilir */}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <nav className="flex gap-4 p-4 bg-gray-100">
+        <Link to="/">Ana Sayfa</Link>
+        <Link to="/tum-odemeler">Tüm Ödemeler</Link>
+        <Link to="/ayarlar">Ayarlar</Link>
+      </nav>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/tum-odemeler" element={<AllReceipts />} />
+        <Route path="/ayarlar" element={<Settings />} />
+      </Routes>
+    </Router>
+  );
+}
+
+// === Stil için basit Tailwind CSS sınıfları kullanıldı ===
+// <input className="input"> yerine:
+// tailwind.config.js içinde: extend -> theme -> spacing, fontSize özelleştirme yapılabilir.
