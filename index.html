@@ -7,13 +7,11 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Firebase SDK v11.6.1 -->
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
+        // Firebase yapılandırması doğrudan buraya eklendi
 const firebaseConfig = {
   apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
   authDomain: "makbuzum-5977c.firebaseapp.com",
@@ -22,9 +20,6 @@ const firebaseConfig = {
   messagingSenderId: "1011006092472",
   appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
         
         // Canvas ortamından gelen global değişkenler
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // projectId'yi varsayılan appId olarak kullan
@@ -46,8 +41,9 @@ const app = initializeApp(firebaseConfig);
                     userId = user.uid;
                     console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
                     loadPaymentsFromFirestore(); // Kimlik doğrulandıktan sonra ödemeleri yükle
+                    loadCustomTitleFromFirestore(); // Başlığı yükle
+                    document.getElementById('savePaymentButton').disabled = false; // Firebase hazırsa butonu aktif et
                 } else {
-                    // Token yoksa veya kullanıcı çıkış yaptıysa anonim olarak oturum aç
                     try {
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
@@ -57,16 +53,19 @@ const app = initializeApp(firebaseConfig);
                             console.log("Anonim olarak oturum açıldı.");
                         }
                     } catch (error) {
-                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error); // Daha açıklayıcı log
-                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin."); // Konsolu kontrol etme talimatı
+                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error);
+                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin.");
                         userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
                         loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
+                        document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
                     }
                 }
             });
         } else {
             console.warn("Firebase yapılandırması bulunamadı. Çevrimdışı modda çalışılıyor.");
+            alert("Firebase aktif değil. Ödemeler kalıcı olarak kaydedilemeyecek. Lütfen Firebase kurulumunu kontrol edin.");
             userId = crypto.randomUUID(); // Çevrimdışı kullanım için rastgele ID
+            document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
             // payments dizisi zaten global olarak tanımlı, yerel olarak çalışmaya devam edecek.
             // loadRecentPayments() DOMContentLoaded içinde zaten çağrılıyor.
         }
@@ -88,6 +87,7 @@ const app = initializeApp(firebaseConfig);
         window.doc = doc;
         window.getDocs = getDocs;
         window.runTransaction = runTransaction;
+        window.setDoc = setDoc; // setDoc'u da ekle
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -155,6 +155,11 @@ const app = initializeApp(firebaseConfig);
 
         button:hover {
             background-color: #1d4ed8; /* Tailwind blue-700 */
+        }
+
+        button:disabled {
+            background-color: #9ca3af; /* Tailwind gray-400 */
+            cursor: not-allowed;
         }
 
         .btn-secondary {
@@ -356,7 +361,7 @@ const app = initializeApp(firebaseConfig);
                 <option value="Kredi Kartı">Kredi Kartı</option>
             </select>
             <div class="btn-group">
-                <button id="savePaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Kaydet ve Makbuz Oluştur</button>
+                <button id="savePaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200" disabled>Kaydet ve Makbuz Oluştur</button>
                 <button id="cancelPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">İptal</button>
             </div>
         </div>
@@ -462,7 +467,7 @@ const app = initializeApp(firebaseConfig);
         // Ancak, IDE'ler için tip denetimi sağlamak adına yorum satırı olarak bırakılabilir.
         // import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         // import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Ödemeleri geçici olarak saklayacak dizi
         let payments = [];
@@ -470,7 +475,8 @@ const app = initializeApp(firebaseConfig);
         let customTitle = "Makbuz Oluşturma Sistemi";
 
         // Şifreler
-        const savePassword = '5210';
+        const savePassword = '5210'; // Bu şifre artık kullanılmıyor
+        const settingsPassword = '5210'; // Ayarlar için yeni şifre
         const clearPassword = '1052';
 
         // Global variable to store the payment data for the currently displayed receipt
@@ -536,6 +542,50 @@ const app = initializeApp(firebaseConfig);
                 console.error("Makbuz ID oluşturma başarısız oldu:", e);
                 alert("Makbuz numarası oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.");
                 return Date.now(); // Firestore hatası durumunda zaman damgası kullan
+            }
+        }
+
+        // Özel başlığı Firestore'dan yükleme
+        async function loadCustomTitleFromFirestore() {
+            const db = window.db;
+            const appId = window.appId;
+            const titleRef = window.doc(db, `artifacts/${appId}/public/data/settings/custom_title`);
+
+            if (!db) {
+                console.warn("Firestore başlatılmadı. Başlık yerel olarak kalacak.");
+                return;
+            }
+
+            try {
+                const docSnap = await window.getDocs(window.query(window.collection(db, `artifacts/${appId}/public/data/settings`), window.limit(1))); // Sadece ilk belgeyi al
+                if (!docSnap.empty) {
+                    customTitle = docSnap.docs[0].data().title || "Makbuz Oluşturma Sistemi";
+                    document.getElementById('mainTitle').textContent = customTitle;
+                    document.getElementById('customTitleInput').value = customTitle;
+                }
+            } catch (e) {
+                console.error("Başlık Firestore'dan yüklenirken hata oluştu:", e);
+            }
+        }
+
+        // Özel başlığı Firestore'a kaydetme
+        async function saveCustomTitleToFirestore(newTitle) {
+            const db = window.db;
+            const appId = window.appId;
+            const titleRef = window.doc(db, `artifacts/${appId}/public/data/settings/custom_title`);
+
+            if (!db) {
+                console.warn("Firestore başlatılmadı. Başlık kaydedilemedi.");
+                return;
+            }
+
+            try {
+                // Firestore'da tek bir başlık belgesi tutmak için setDoc kullan
+                await window.setDoc(titleRef, { title: newTitle });
+                console.log("Başlık Firestore'a kaydedildi:", newTitle);
+            } catch (e) {
+                console.error("Başlık Firestore'a kaydedilirken hata oluştu:", e);
+                alert("Başlık kaydedilirken bir hata oluştu.");
             }
         }
 
@@ -614,9 +664,6 @@ const app = initializeApp(firebaseConfig);
             const shareModalMailButton = document.getElementById('shareModalMailButton');
             const shareModalPrintButton = document.getElementById('shareModalPrintButton');
 
-            // PDF oluşturmak için gizli konteyner (artık dinamik olarak oluşturulacak)
-            // const pdfPrintContainer = document.getElementById('pdfPrintContainer'); 
-
             // Sayfa yüklendiğinde tüm modalları ve aksiyon alanlarını gizle
             allPaymentsModal.classList.add('hidden');
             settingsModal.classList.add('hidden');
@@ -628,7 +675,7 @@ const app = initializeApp(firebaseConfig);
             paymentForm.classList.remove('hidden'); 
             addPaymentButton.classList.add('hidden'); 
             
-            // Firebase başlatıldığında ödemeler otomatik yüklenecek
+            // Firebase başlatıldığında ödemeler ve başlık otomatik yüklenecek
             // Eğer Firebase config yoksa, yerel yükleme devreye girer.
             if (!window.db) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
                 loadRecentPayments();
@@ -657,12 +704,17 @@ const app = initializeApp(firebaseConfig);
             }
 
             // Başlık ayarla
-            setCustomTitleButton.addEventListener('click', () => {
+            setCustomTitleButton.addEventListener('click', async () => {
                 const newTitle = customTitleInput.value.trim();
                 if (newTitle) {
                     customTitle = newTitle;
                     mainTitle.textContent = customTitle;
-                    alert('Başlık başarıyla güncellendi!');
+                    if (window.db) {
+                        await saveCustomTitleToFirestore(newTitle);
+                        alert('Başlık başarıyla güncellendi ve kaydedildi!');
+                    } else {
+                        alert('Başlık başarıyla güncellendi (yerel). Firebase aktif değil.');
+                    }
                 } else {
                     alert('Lütfen bir başlık girin.');
                 }
@@ -687,14 +739,8 @@ const app = initializeApp(firebaseConfig);
 
             // Ödemeyi kaydet ve makbuz oluştur
             savePaymentButton.addEventListener('click', async () => { // async eklendi
-                const enteredPassword = prompt("Makbuz oluşturmak için şifreyi girin:");
-                if (enteredPassword !== savePassword) {
-                    alert("Yanlış şifre! Makbuz oluşturulamadı.");
-                    // Önceki ekrana dönmek için formu tekrar göster
-                    showSection('paymentForm');
-                    return;
-                }
-
+                // Şifre kontrolü kaldırıldı
+                
                 const payerName = document.getElementById('payerName').value.trim();
                 const childName = document.getElementById('childName').value.trim();
                 const paymentDescription = document.getElementById('paymentDescription').value.trim();
@@ -1130,6 +1176,11 @@ const app = initializeApp(firebaseConfig);
 
             // Ayarlar Butonu
             settingsButton.addEventListener('click', () => {
+                const enteredPassword = prompt("Ayarlar sayfasına erişmek için şifreyi girin:");
+                if (enteredPassword !== settingsPassword) {
+                    alert("Yanlış şifre! Ayarlar sayfasına erişilemedi.");
+                    return;
+                }
                 showSection('settingsModal');
                 // Ayarlar modalı açıldığında aylık rapor seçicilerini doldur
                 populateMonthYearSelectors();
