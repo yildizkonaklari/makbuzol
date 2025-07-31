@@ -11,14 +11,15 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
-  authDomain: "makbuzum-5977c.firebaseapp.com",
-  projectId: "makbuzum-5977c",
-  storageBucket: "makbuzum-5977c.firebasestorage.app",
-  messagingSenderId: "1011006092472",
-  appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
-};
+        // Firebase yapılandırması doğrudan buraya eklendi
+        const firebaseConfig = {
+            apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
+            authDomain: "makbuzum-5977c.firebaseapp.com",
+            projectId: "makbuzum-5977c",
+            storageBucket: "makbuzum-5977c.firebasestorage.app",
+            messagingSenderId: "1011006092472",
+            appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
+        };
         
         // Canvas ortamından gelen global değişkenler
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // projectId'yi varsayılan appId olarak kullan
@@ -108,7 +109,7 @@ const firebaseConfig = {
         async function loadCustomTitleFromFirestore() {
             const db = window.db;
             const appId = window.appId;
-            const titleColRef = window.collection(db, `artifacts/${appId}/public/data/settings`);
+            const titleRef = window.doc(db, `artifacts/${appId}/public/data/settings/custom_title`);
 
             if (!db) {
                 console.warn("Firestore başlatılmadı. Başlık yerel olarak kalacak.");
@@ -116,22 +117,22 @@ const firebaseConfig = {
             }
 
             try {
-                const docSnap = await window.getDocs(window.query(titleColRef, window.limit(1)));
+                const docSnap = await window.getDoc(titleRef); // doc() ile doğrudan belgeyi al
                 
-                if (!docSnap.empty && docSnap.docs[0].id === 'custom_title') {
-                    customTitle = docSnap.docs[0].data().title || "Makbuz Oluşturma Sistemi";
-                    // DOM elementleri DOMContentLoaded içinde hazırlandığı için burada doğrudan erişim güvenli değil.
-                    // Bu değerler DOMContentLoaded içindeki ilgili elementlere atanacaktır.
+                if (docSnap.exists()) {
+                    customTitle = docSnap.data().title || "Makbuz Oluşturma Sistemi";
                 } else {
                     customTitle = "Makbuz Oluşturma Sistemi"; // Varsayılanı kullan
                     await saveCustomTitleToFirestore(customTitle); // Varsayılanı kaydet
                 }
                 // Başlık güncellendikten sonra DOM'u güncelle
-                if (document.getElementById('mainTitle')) {
-                    document.getElementById('mainTitle').textContent = customTitle;
+                const mainTitleElement = document.getElementById('mainTitle');
+                const customTitleInputElement = document.getElementById('customTitleInput');
+                if (mainTitleElement) {
+                    mainTitleElement.textContent = customTitle;
                 }
-                if (document.getElementById('customTitleInput')) {
-                    document.getElementById('customTitleInput').value = customTitle;
+                if (customTitleInputElement) {
+                    customTitleInputElement.value = customTitle;
                 }
 
             } catch (e) {
@@ -386,9 +387,13 @@ const firebaseConfig = {
             tempReportContainer.style.opacity = '0';
             document.body.appendChild(tempReportContainer);
 
+            // reportMonthSelect elementinin DOM'da var olduğundan emin olun
+            const reportMonthSelectElement = document.getElementById('reportMonth');
+            const selectedMonthText = reportMonthSelectElement ? reportMonthSelectElement.options[reportMonthSelectElement.selectedIndex].text : '';
+
             let reportHtmlContent = `
                 <div style="font-family: 'Inter', sans-serif; padding: 20mm; box-sizing: border-box; width: 210mm; height: 297mm;">
-                    <h2 style="text-align: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #1f2937;">${document.getElementById('reportMonth').options[document.getElementById('reportMonth').selectedIndex].text} ${year} Ayı Ödeme Raporu</h2>
+                    <h2 style="text-align: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #1f2937;">${selectedMonthText} ${year} Ayı Ödeme Raporu</h2>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
                         <thead>
                             <tr style="background-color: #e5e7eb;">
@@ -433,7 +438,7 @@ const firebaseConfig = {
 
             const opt = {
                 margin:       10,
-                filename:     `aylik_rapor_${document.getElementById('reportMonth').options[document.getElementById('reportMonth').selectedIndex].text.toLowerCase()}_${year}.pdf`,
+                filename:     `aylik_rapor_${selectedMonthText.toLowerCase()}_${year}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -551,7 +556,7 @@ const firebaseConfig = {
                         <div>
                             <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
                             <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
-                            <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
+                            <p class="text-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
                             <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
                         </div>
                     `;
@@ -598,7 +603,7 @@ const firebaseConfig = {
         // --- Firebase Başlatma ---
         // Bu kısım, DOMContentLoaded'dan önce çalışır ve Firebase objelerini hazırlar.
         // DOM'a bağımlı fonksiyonlar burada çağrılmamalıdır.
-        if (firebaseConfig) {
+        if (firebaseConfig.apiKey) { // firebaseConfig'in gerçekten sağlandığını kontrol et
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
@@ -606,6 +611,7 @@ const firebaseConfig = {
             // window objesindeki db ve auth referanslarını güncelle
             window.db = db;
             window.auth = auth;
+            window.appId = appId; // appId'nin de erken global olarak kullanılabilir olduğundan emin olun
 
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -645,6 +651,8 @@ const firebaseConfig = {
 
         // --- Global Fonksiyon Atamaları (Firebase modülleri yüklendikten sonra) ---
         // Bu atamalar, fonksiyonlar kullanılmadan önce yapılmalıdır.
+        // Firebase modüllerinden gelen fonksiyonlar zaten yukarıda import edildi ve window'a atandı.
+        // Sadece kendi tanımladığımız fonksiyonları atıyoruz.
         window.generateReceiptId = generateReceiptId;
         window.loadCustomTitleFromFirestore = loadCustomTitleFromFirestore;
         window.saveCustomTitleToFirestore = saveCustomTitleToFirestore;
@@ -665,7 +673,7 @@ const firebaseConfig = {
 
         // --- DOMContentLoaded Olay Dinleyicisi ---
         // Tüm DOM manipülasyonları ve olay dinleyicileri buraya taşındı.
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const mainTitle = document.getElementById('mainTitle');
             const customTitleInput = document.getElementById('customTitleInput');
             const setCustomTitleButton = document.getElementById('setCustomTitleButton');
@@ -714,14 +722,22 @@ const firebaseConfig = {
             paymentForm.classList.remove('hidden'); 
             addPaymentButton.classList.add('hidden'); 
             
-            // Firebase başlatıldığında ödemeler ve başlık otomatik yüklenecek
-            // Eğer Firebase config yoksa, yerel yükleme devreye girer.
-            if (window.db) { // Firebase objesi tanımlıysa
+            // Firebase objesi tanımlıysa (yani yapılandırma sağlandıysa)
+            if (window.db) { 
                 // Firebase kimlik doğrulama durumu değiştiğinde bu fonksiyonlar çağrılacak
                 // İlk yüklemede de çağrılır.
-                window.loadPaymentsFromFirestore();
-                window.loadCustomTitleFromFirestore();
-                savePaymentButton.disabled = false; // Firebase hazırsa butonu aktif et
+                // Eğer auth.currentUser zaten varsa, doğrudan yükle.
+                // Yoksa, onAuthStateChanged callback'i yüklemeyi tetikleyecektir.
+                if (window.auth && window.auth.currentUser) {
+                    await window.loadPaymentsFromFirestore();
+                    await window.loadCustomTitleFromFirestore();
+                    savePaymentButton.disabled = false; // Firebase hazırsa butonu aktif et
+                } else {
+                    // Firebase başlatıldı ama henüz kimlik doğrulanmadıysa, buton devre dışı kalsın.
+                    // onAuthStateChanged event listener'ı kimlik doğrulama tamamlandığında butonu aktif edecek.
+                    savePaymentButton.disabled = true; 
+                    window.loadRecentPayments(); // Geçici olarak yerel verileri göster
+                }
             } else {
                 // Firebase aktif değilse, yerel yükleme yap ve butonu devre dışı bırak
                 window.loadRecentPayments();
