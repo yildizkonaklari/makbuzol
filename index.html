@@ -1,163 +1,172 @@
-// Gerekli bağımlılıklar:
-// npm install react-router-dom firebase jspdf html2canvas
 
-import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Makbuz Sistemi</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-router-dom@6/umd/react-router-dom.development.js" crossorigin></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+  <script type="text/babel">
 
-// === BURAYA FIREBASE BİLGİLERİNİ GİRECEKSİNİZ ===
-// Bu alanı kendi Firebase projenize göre düzenlemeniz gerekiyor.
-// HTML'e aktarımda burası gizli tutulmalı veya dışarıdan yüklenmeli.
-const firebaseConfig = {
-  apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
-  authDomain: "makbuzum-5977c.firebaseapp.com",
-  projectId: "makbuzum-5977c",
-  storageBucket: "makbuzum-5977c.firebasestorage.app",
-  messagingSenderId: "1011006092472",
-  appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
-};
-// Tarayıcı destekli PDF oluşturmak için jsPDF kullanılmakta.
-// HTML versiyonda bu kütüphane <script> etiketi ile dışarıdan dahil etmelisiniz.
-// Aynı şekilde html2canvas da tarayıcıya uygun bir <script> etiketi ile HTML dosyasına dahil edilmelidir.
-initializeApp(firebaseConfig);
-const db = getFirestore();
+    const { useState, useEffect } = React;
+    const { BrowserRouter, Routes, Route, Link } = ReactRouterDOM;
+    const { initializeApp } = firebase;
+    const { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } = firebase.firestore;
 
-function formatDate(date) {
-  return new Date(date).toLocaleDateString("tr-TR");
-}
+    const firebaseConfig = {
+      apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
+      authDomain: "makbuzum-5977c.firebaseapp.com",
+      projectId: "makbuzum-5977c",
+      storageBucket: "makbuzum-5977c.firebasestorage.app",
+      messagingSenderId: "1011006092472",
+      appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
+    };
 
-function generateReceiptNumber() {
-  const now = new Date();
-  const key = `counter_${now.getFullYear()}_${now.getMonth() + 1}`;
-  const count = parseInt(localStorage.getItem(key)) || 1000;
-  localStorage.setItem(key, count + 1);
-  return count;
-}
+    // Bu alanı kendi Firebase projenize göre düzenlemeniz gerekiyor.
+    // HTML'e aktarımda burası gizli tutulmalı veya dışarıdan yüklenmeli.
+    initializeApp(firebaseConfig);
+    const db = getFirestore();
 
-function Home() {
-  const [form, setForm] = useState({
-    name: "",
-    child: "",
-    phone: "",
-    note: "",
-    amount: "",
-    method: "nakit"
-  });
-  const [receipt, setReceipt] = useState(null);
+    function formatDate(date) {
+      return new Date(date).toLocaleDateString("tr-TR");
+    }
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+    function generateReceiptNumber() {
+      const now = new Date();
+      const key = `counter_${now.getFullYear()}_${now.getMonth() + 1}`;
+      const count = parseInt(localStorage.getItem(key)) || 1000;
+      localStorage.setItem(key, count + 1);
+      return count;
+    }
 
-  const handleSubmit = async () => {
-    const number = generateReceiptNumber();
-    const newReceipt = { ...form, number, date: Date.now() };
-    const docRef = await addDoc(collection(db, "receipts"), newReceipt);
-    setReceipt({ id: docRef.id, ...newReceipt });
-  };
+    function Home() {
+      const [form, setForm] = useState({
+        name: "", child: "", phone: "", note: "", amount: "", method: "nakit"
+      });
+      const [receipt, setReceipt] = useState(null);
 
-  const downloadPDF = async () => {
-    const element = document.getElementById("receipt");
-    const canvas = await html2canvas(element);
-    const img = canvas.toDataURL("image/png");
-    const pdf = new jsPDF();
-    pdf.addImage(img, "PNG", 10, 10, 190, 0);
-    pdf.save(`makbuz_${receipt.number}.pdf`);
-  };
+      const handleChange = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+      };
 
-  return (
-    <div className="p-4 max-w-md mx-auto">
-      <h2 className="text-xl font-bold mb-2">Makbuz Ekle</h2>
-      <input name="name" placeholder="Ad Soyad" onChange={handleChange} className="input" />
-      <input name="child" placeholder="Çocuk Ad Soyad" onChange={handleChange} className="input" />
-      <input name="phone" placeholder="Telefon" onChange={handleChange} className="input" />
-      <input name="note" placeholder="Açıklama" onChange={handleChange} className="input" />
-      <input name="amount" placeholder="Tutar (TL)" onChange={handleChange} className="input" />
-      <select name="method" onChange={handleChange} className="input">
-        <option value="nakit">Nakit</option>
-        <option value="kredi kartı">Kredi Kartı</option>
-      </select>
-      <button onClick={handleSubmit} className="btn">Kaydet</button>
+      const handleSubmit = async () => {
+        const number = generateReceiptNumber();
+        const newReceipt = { ...form, number, date: Date.now() };
+        const docRef = await addDoc(collection(db, "receipts"), newReceipt);
+        setReceipt({ id: docRef.id, ...newReceipt });
+      };
 
-      {receipt && (
-        <div id="receipt" className="border p-4 mt-4">
-          <h3 className="font-bold">Makbuz #{receipt.number}</h3>
-          <p>{receipt.name} - {receipt.child}</p>
-          <p>{receipt.phone}</p>
-          <p>{receipt.note}</p>
-          <p>{receipt.amount} TL ({receipt.method})</p>
-          <p>{formatDate(receipt.date)}</p>
-          <div className="mt-2">
-            <button onClick={downloadPDF} className="btn">Paylaş</button>
-            {/* Whatsapp, eposta, yazdır seçenekleri buraya eklenebilir */}
-          </div>
+      const downloadPDF = async () => {
+        const element = document.getElementById("receipt");
+        const canvas = await html2canvas(element);
+        const img = canvas.toDataURL("image/png");
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        pdf.addImage(img, "PNG", 10, 10, 190, 0);
+        pdf.save(`makbuz_${receipt.number}.pdf`);
+      };
+
+      return (
+        <div className="p-4 max-w-md mx-auto">
+          <h2 className="text-xl font-bold mb-2">Makbuz Ekle</h2>
+          <input name="name" placeholder="Ad Soyad" onChange={handleChange} className="input block w-full mb-2 p-2 border" />
+          <input name="child" placeholder="Çocuk Ad Soyad" onChange={handleChange} className="input block w-full mb-2 p-2 border" />
+          <input name="phone" placeholder="Telefon" onChange={handleChange} className="input block w-full mb-2 p-2 border" />
+          <input name="note" placeholder="Açıklama" onChange={handleChange} className="input block w-full mb-2 p-2 border" />
+          <input name="amount" placeholder="Tutar (TL)" onChange={handleChange} className="input block w-full mb-2 p-2 border" />
+          <select name="method" onChange={handleChange} className="input block w-full mb-2 p-2 border">
+            <option value="nakit">Nakit</option>
+            <option value="kredi kartı">Kredi Kartı</option>
+          </select>
+          <button onClick={handleSubmit} className="btn bg-blue-500 text-white px-4 py-2 rounded">Kaydet</button>
+
+          {receipt && (
+            <div id="receipt" className="border p-4 mt-4 bg-white">
+              <h3 className="font-bold">Makbuz #{receipt.number}</h3>
+              <p>{receipt.name} - {receipt.child}</p>
+              <p>{receipt.phone}</p>
+              <p>{receipt.note}</p>
+              <p>{receipt.amount} TL ({receipt.method})</p>
+              <p>{formatDate(receipt.date)}</p>
+              <div className="mt-2">
+                <button onClick={downloadPDF} className="btn bg-green-500 text-white px-4 py-2 rounded">PDF Paylaş</button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }
 
-function AllReceipts() {
-  const [list, setList] = useState([]);
+    function AllReceipts() {
+      const [list, setList] = useState([]);
 
-  const fetchReceipts = async () => {
-    const snapshot = await getDocs(collection(db, "receipts"));
-    setList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+      const fetchReceipts = async () => {
+        const snapshot = await getDocs(collection(db, "receipts"));
+        setList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      };
 
-  useEffect(() => {
-    fetchReceipts();
-  }, []);
+      useEffect(() => {
+        fetchReceipts();
+      }, []);
 
-  return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-2">Tüm Ödemeler</h2>
-      {list.map(r => (
-        <div key={r.id} className="border p-2 mb-2">
-          <p>#{r.number} - {r.name} - {r.amount} TL</p>
-          <p>{formatDate(r.date)}</p>
+      return (
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-2">Tüm Ödemeler</h2>
+          {list.map(r => (
+            <div key={r.id} className="border p-2 mb-2 bg-white">
+              <p>#{r.number} - {r.name} - {r.amount} TL</p>
+              <p>{formatDate(r.date)}</p>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-  );
-}
+      );
+    }
 
-function Settings() {
-  const clearReceipts = async () => {
-    const snapshot = await getDocs(collection(db, "receipts"));
-    snapshot.forEach(async (d) => await deleteDoc(doc(db, "receipts", d.id)));
-    alert("Tüm makbuzlar silindi");
-  };
+    function Settings() {
+      const clearReceipts = async () => {
+        const snapshot = await getDocs(collection(db, "receipts"));
+        snapshot.forEach(async (d) => await deleteDoc(doc(db, "receipts", d.id)));
+        alert("Tüm makbuzlar silindi");
+      };
 
-  return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Ayarlar</h2>
-      <button onClick={clearReceipts} className="btn">Tüm Ödemeleri Sil</button>
-      {/* Aylık PDF indirme özelliği buraya eklenebilir */}
-    </div>
-  );
-}
+      return (
+        <div className="p-4">
+          <h2 className="text-xl font-bold mb-4">Ayarlar</h2>
+          <button onClick={clearReceipts} className="btn bg-red-500 text-white px-4 py-2 rounded">Tüm Ödemeleri Sil</button>
+        </div>
+      );
+    }
 
-export default function App() {
-  return (
-    <Router>
-      <nav className="flex gap-4 p-4 bg-gray-100">
-        <Link to="/">Ana Sayfa</Link>
-        <Link to="/tum-odemeler">Tüm Ödemeler</Link>
-        <Link to="/ayarlar">Ayarlar</Link>
-      </nav>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/tum-odemeler" element={<AllReceipts />} />
-        <Route path="/ayarlar" element={<Settings />} />
-      </Routes>
-    </Router>
-  );
-}
+    function App() {
+      return (
+        <BrowserRouter>
+          <nav className="flex gap-4 p-4 bg-gray-100">
+            <Link to="/">Ana Sayfa</Link>
+            <Link to="/tum-odemeler">Tüm Ödemeler</Link>
+            <Link to="/ayarlar">Ayarlar</Link>
+          </nav>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/tum-odemeler" element={<AllReceipts />} />
+            <Route path="/ayarlar" element={<Settings />} />
+          </Routes>
+        </BrowserRouter>
+      );
+    }
 
-// === Stil için basit Tailwind CSS sınıfları kullanıldı ===
-// <input className="input"> yerine:
-// tailwind.config.js içinde: extend -> theme -> spacing, fontSize özelleştirme yapılabilir.
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+
+  </script>
+</body>
+</html>
