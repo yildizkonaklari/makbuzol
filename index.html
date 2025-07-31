@@ -12,14 +12,14 @@
         import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase yapılandırması doğrudan buraya eklendi
-const firebaseConfig = {
-  apiKey: "AIzaSyDiWCr7T5eh77Vjvz7y4obvuBtgfi5GOBY",
-  authDomain: "makbuzum-5977c.firebaseapp.com",
-  projectId: "makbuzum-5977c",
-  storageBucket: "makbuzum-5977c.firebasestorage.app",
-  messagingSenderId: "1011006092472",
-  appId: "1:1011006092472:web:85c04c92706c8dabf2704d"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyDx6buFRmcq8Llrf_YgMBelYvj19TIuSWs",
+            authDomain: "makbuz-ver.firebaseapp.com",
+            projectId: "makbuz-ver",
+            storageBucket: "makbuz-ver.firebasestorage.app",
+            messagingSenderId: "764022579482",
+            appId: "1:764022579482:web:60748b0e628e3d9f468ca3"
+        };
         
         // Canvas ortamından gelen global değişkenler
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // projectId'yi varsayılan appId olarak kullan
@@ -30,53 +30,12 @@ const firebaseConfig = {
         let auth;
         let userId; // Kimliği doğrulanmış kullanıcı ID'si veya rastgele bir ID
 
-        // Firestore ve Auth'u başlat
-        if (firebaseConfig) {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
-                    loadPaymentsFromFirestore(); // Kimlik doğrulandıktan sonra ödemeleri yükle
-                    loadCustomTitleFromFirestore(); // Başlığı yükle
-                    document.getElementById('savePaymentButton').disabled = false; // Firebase hazırsa butonu aktif et
-                } else {
-                    try {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                            console.log("Canvas tarafından sağlanan token ile oturum açıldı.");
-                        } else {
-                            await signInAnonymously(auth);
-                            console.log("Anonim olarak oturum açıldı.");
-                        }
-                    } catch (error) {
-                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error);
-                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin.");
-                        userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
-                        loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
-                        document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
-                    }
-                }
-            });
-        } else {
-            console.warn("Firebase yapılandırması bulunamadı. Çevrimdışı modda çalışılıyor.");
-            alert("Firebase aktif değil. Ödemeler kalıcı olarak kaydedilemeyecek. Lütfen Firebase kurulumunu kontrol edin.");
-            userId = crypto.randomUUID(); // Çevrimdışı kullanım için rastgele ID
-            document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
-            // payments dizisi zaten global olarak tanımlı, yerel olarak çalışmaya devam edecek.
-            // loadRecentPayments() DOMContentLoaded içinde zaten çağrılıyor.
-        }
-
         // Global erişim için gerekli fonksiyonları window objesine ekle
-        window.db = db;
-        window.auth = auth;
+        // Bu atamalar, fonksiyonlar kullanılmadan önce yapılmalıdır.
+        window.db = db; // Başlangıçta undefined olabilir, Firebase başlatıldığında güncellenecek
+        window.auth = auth; // Başlangıçta undefined olabilir, Firebase başlatıldığında güncellenecek
         window.appId = appId;
         window.userId = userId; // Henüz tanımlanmamış olabilir, onAuthStateChanged içinde güncellenecek
-        window.generateReceiptId = generateReceiptId; // Makbuz ID oluşturma fonksiyonu
-        window.loadPaymentsFromFirestore = loadPaymentsFromFirestore; // Ödemeleri Firestore'dan yükleme fonksiyonu
         window.addDoc = addDoc;
         window.collection = collection;
         window.query = query;
@@ -87,387 +46,7 @@ const firebaseConfig = {
         window.doc = doc;
         window.getDocs = getDocs;
         window.runTransaction = runTransaction;
-        window.setDoc = setDoc; // setDoc'u da ekle
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <style>
-        /* Inter fontunu yükle */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Tailwind gray-100 */
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 2rem;
-        }
-
-        .container {
-            background-color: #ffffff; /* Beyaz arka plan */
-            padding: 2.5rem;
-            border-radius: 0.75rem; /* rounded-lg */
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Hafif gölge */
-            width: 100%;
-            max-width: 64rem; /* max-w-4xl */
-            box-sizing: border-box;
-        }
-
-        h1, h2 {
-            text-align: center;
-            color: #1f2937; /* Tailwind gray-800 */
-            margin-bottom: 1.5rem;
-            font-weight: 700; /* font-bold */
-        }
-
-        input[type="text"],
-        input[type="number"],
-        input[type="tel"],
-        textarea, /* textarea için stil eklendi */
-        select {
-            width: 100%;
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            border: 1px solid #d1d5db; /* Tailwind gray-300 */
-            border-radius: 0.375rem; /* rounded-md */
-            box-sizing: border-box;
-            font-size: 1rem;
-            color: #374151; /* Tailwind gray-700 */
-        }
-
-        textarea {
-            resize: vertical; /* Sadece dikey yeniden boyutlandırma */
-            /* min-height kaldırıldı, rows özniteliği kontrol edecek */
-        }
-
-        button {
-            background-color: #2563eb; /* Tailwind blue-600 */
-            color: white;
-            padding: 0.75rem 1.25rem;
-            border: none;
-            border-radius: 0.375rem; /* rounded-md */
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500; /* font-medium */
-            transition: background-color 0.2s ease-in-out;
-        }
-
-        button:hover {
-            background-color: #1d4ed8; /* Tailwind blue-700 */
-        }
-
-        button:disabled {
-            background-color: #9ca3af; /* Tailwind gray-400 */
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background-color: #6b7280; /* Tailwind gray-500 */
-        }
-
-        .btn-secondary:hover {
-            background-color: #4b5563; /* Tailwind gray-600 */
-        }
-
-        .btn-danger {
-            background-color: #dc2626; /* Tailwind red-600 */
-        }
-        .btn-danger:hover {
-            background-color: #b91c1c; /* Tailwind red-700 */
-        }
-
-        .btn-success {
-            background-color: #10b981; /* Tailwind green-500 */
-        }
-        .btn-success:hover {
-            background-color: #059669; /* Tailwind green-600 */
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1rem;
-            justify-content: center;
-            flex-wrap: wrap; /* Küçük ekranlarda sarmalama */
-        }
-
-        .hidden {
-            display: none !important; /* !important tekrar eklendi */
-        }
-
-        .payment-item {
-            border: 1px solid #e5e7eb; /* Tailwind gray-200 */
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            border-radius: 0.5rem; /* rounded-lg */
-            background-color: #f9fafb; /* Tailwind gray-50 */
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .payment-item p {
-            margin: 0.25rem 0;
-            color: #4b5563; /* Tailwind gray-600 */
-        }
-
-        .payment-item strong {
-            color: #1f2937; /* Tailwind gray-800 */
-        }
-
-        /* Makbuz Görünümü Stilleri */
-        #receiptDisplay {
-            background-color: #fff;
-            border: 1px dashed #9ca3af; /* Tailwind gray-400 */
-            padding: 1.5rem;
-            margin-top: 2rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            max-width: 400px; /* Makbuz genişliği */
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        #receiptDisplay h3 {
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: #1f2937;
-        }
-
-        #receiptDisplay p {
-            margin-bottom: 0.5rem;
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }
-
-        #receiptDisplay .receipt-line {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.25rem;
-        }
-
-        #receiptDisplay .receipt-total {
-            font-size: 1.1rem;
-            font-weight: 600;
-            border-top: 1px solid #d1d5db;
-            padding-top: 0.75rem;
-            margin-top: 1rem;
-        }
-
-        #receiptDisplay .receipt-footer {
-            text-align: center;
-            font-size: 0.85rem;
-            color: #6b7280;
-            margin-top: 1.5rem;
-        }
-
-        /* Modal Stilleri */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-            width: 90%;
-            max-width: 800px;
-            max-height: 90vh;
-            overflow-y: auto;
-            position: relative;
-        }
-
-        .modal-close-button {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #4b5563;
-        }
-
-        .modal-close-button:hover {
-            color: #1f2937;
-        }
-
-        /* Yazdırma için özel stil */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            /* Sadece PDF konteynerini yazdır */
-            #pdfPrintContainer, #pdfPrintContainer * {
-                visibility: visible;
-            }
-            #pdfPrintContainer {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 210mm;
-                height: 297mm;
-                padding: 0;
-                margin: 0;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-around;
-                align-items: center;
-            }
-            .no-print {
-                display: none;
-            }
-        }
-    </style>
-</head>
-<body class="bg-gray-100 flex justify-center items-start min-h-screen p-8">
-    <div class="container bg-white p-10 rounded-lg shadow-xl w-full max-w-4xl">
-        <h1 id="mainTitle" class="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Makbuz Oluşturma Sistemi</h1>
-
-        <!-- Ana İşlem Butonları -->
-        <div class="btn-group mb-8">
-            <button id="addPaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 hidden">
-                Ödeme Ekle
-            </button>
-            <button id="allPaymentsButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
-                Tüm Ödemeler
-            </button>
-            <button id="settingsButton" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">
-                Ayarlar
-            </button>
-        </div>
-
-        <!-- Ödeme Ekleme Formu -->
-        <div id="paymentForm" class="bg-gray-50 p-6 rounded-lg shadow-inner mb-8">
-            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Yeni Ödeme Ekle</h2>
-            <input type="text" id="payerName" placeholder="Ödeme Yapan Kişi Adı Soyadı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="text" id="childName" placeholder="Çocuk Adı Soyadı (Opsiyonel)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <textarea id="paymentDescription" placeholder="Ödeme Açıklaması" rows="2" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-            <input type="number" id="paymentAmount" placeholder="Ödeme Tutarı" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="tel" id="phoneNumber" placeholder="Telefon Numarası (Örn: 5xx xxx xx xx)" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <select id="paymentMethod" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="Nakit">Nakit</option>
-                <option value="Kredi Kartı">Kredi Kartı</option>
-            </select>
-            <div class="btn-group">
-                <button id="savePaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200" disabled>Kaydet ve Makbuz Oluştur</button>
-                <button id="cancelPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">İptal</button>
-            </div>
-        </div>
-
-        <!-- Makbuz Oluşturuldu Aksiyonları -->
-        <div id="receiptActions" class="hidden text-center mt-6 no-print">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Makbuz Oluşturuldu!</h2>
-            <div class="btn-group">
-                <button id="shareMainButton" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Paylaş</button>
-                <!-- PDF İndir butonu buraya taşındı -->
-                <button id="newPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">Yeni Ödeme Ekle</button>
-            </div>
-        </div>
-
-        <!-- Makbuz Görüntüleme Alanı -->
-        <div id="receiptDisplay" class="hidden mt-8">
-            <!-- Makbuz içeriği buraya JavaScript ile yüklenecek -->
-        </div>
-
-        <!-- Son Eklenen Ödemeler -->
-        <h2 class="text-2xl font-bold text-gray-800 mt-10 mb-4">Son Eklenen Ödemeler</h2>
-        <div id="recentPayments" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Ödemeler buraya JavaScript ile yüklenecek -->
-            <p id="noPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
-        </div>
-    </div>
-
-    <!-- Tüm Ödemeler Modalı (Eski "Tüm Ödemeler ve Raporlar" modalının sadece ödemeler kısmı) -->
-    <div id="allPaymentsModal" class="modal hidden">
-        <div class="modal-content">
-            <button class="modal-close-button" id="closeAllPaymentsModalButton">&times;</button>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Tüm Ödeme Kayıtları</h2>
-            <div id="allPaymentsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <p id="noAllPaymentsMessage" class="col-span-full text-center text-gray-500">Henüz ödeme eklenmedi.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Ayarlar Modalı -->
-    <div id="settingsModal" class="modal hidden">
-        <div class="modal-content">
-            <button class="modal-close-button" id="closeSettingsModalButton">&times;</button>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ayarlar</h2>
-
-            <!-- Başlık Oluşturma Alanı -->
-            <div class="mb-8 p-4 bg-blue-50 rounded-md shadow-sm">
-                <h3 class="text-xl font-semibold text-blue-800 mb-3">Makbuz Başlığı Oluştur</h3>
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" id="customTitleInput" placeholder="Makbuz Başlığını Buraya Girin" class="flex-grow p-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <button id="setCustomTitleButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">Başlığı Ayarla</button>
-                </div>
-            </div>
-
-            <!-- Aylık Rapor Kontrolleri -->
-            <div class="mb-6 p-4 bg-yellow-50 rounded-md shadow-sm">
-                <h3 class="text-xl font-semibold text-yellow-800 mb-3">Aylık Rapor Al</h3>
-                <div class="flex flex-col sm:flex-row gap-3 items-center">
-                    <select id="reportMonth" class="p-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 flex-grow">
-                        <!-- Aylar JavaScript ile doldurulacak -->
-                    </select>
-                    <select id="reportYear" class="p-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 flex-grow">
-                        <!-- Yıllar JavaScript ile doldurulacak -->
-                    </select>
-                    <button id="generateReportButton" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Raporu Göster</button>
-                    <button id="downloadReportPdfButton" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Raporu PDF İndir</button>
-                </div>
-                <div id="monthlyReportOutput" class="mt-4 p-3 bg-white border border-yellow-200 rounded-md hidden">
-                    <!-- Aylık rapor buraya gelecek -->
-                </div>
-            </div>
-
-            <!-- Ödeme Kayıtlarını Sil Butonu -->
-            <div class="mb-6 p-4 bg-red-50 rounded-md shadow-sm">
-                <h3 class="text-xl font-semibold text-red-800 mb-3">Ödeme Kayıtlarını Sil</h3>
-                <button id="clearPaymentsButton" class="btn-danger bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full">
-                    Tüm Ödeme Kayıtlarını Sil
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Paylaşım Seçenekleri Modalı -->
-    <div id="shareOptionsModal" class="modal hidden">
-        <div class="modal-content">
-            <button class="modal-close-button" id="closeShareOptionsModalButton">&times;</button>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Makbuzu Paylaş</h2>
-            <div class="btn-group flex-col">
-                <!-- PDF Olarak İndir butonu buraya taşındı -->
-                <button id="shareModalDownloadPdfButton" class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">PDF Olarak İndir</button>
-                <button id="shareModalWhatsappButton" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">WhatsApp ile Paylaş (Metin)</button>
-                <button id="shareModalMailButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full mb-3">E-posta ile Paylaş</button>
-                <button id="shareModalPrintButton" class="bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 w-full">Yazdır</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- PDF oluşturmak için gizli konteyner -->
-    <!-- Bu konteyner artık JS tarafından dinamik olarak oluşturulup kaldırılacak -->
-    <!-- <div id="pdfPrintContainer"></div> -->
-
-    <script type="module">
-        // Firebase modülleri window objesine eklendiği için burada tekrar import etmeye gerek yok.
-        // Ancak, IDE'ler için tip denetimi sağlamak adına yorum satırı olarak bırakılabilir.
-        // import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        window.setDoc = setDoc;
 
         // Ödemeleri geçici olarak saklayacak dizi
         let payments = [];
@@ -475,7 +54,6 @@ const firebaseConfig = {
         let customTitle = "Makbuz Oluşturma Sistemi";
 
         // Şifreler
-        const savePassword = '5210'; // Bu şifre artık kullanılmıyor
         const settingsPassword = '5210'; // Ayarlar için yeni şifre
         const clearPassword = '1052';
 
@@ -549,7 +127,7 @@ const firebaseConfig = {
         async function loadCustomTitleFromFirestore() {
             const db = window.db;
             const appId = window.appId;
-            const titleRef = window.doc(db, `artifacts/${appId}/public/data/settings/custom_title`);
+            const titleColRef = window.collection(db, `artifacts/${appId}/public/data/settings`); // Koleksiyon referansı
 
             if (!db) {
                 console.warn("Firestore başlatılmadı. Başlık yerel olarak kalacak.");
@@ -557,11 +135,20 @@ const firebaseConfig = {
             }
 
             try {
-                const docSnap = await window.getDocs(window.query(window.collection(db, `artifacts/${appId}/public/data/settings`), window.limit(1))); // Sadece ilk belgeyi al
-                if (!docSnap.empty) {
+                // Sadece 'custom_title' belgesini hedefle
+                const titleDocRef = window.doc(titleColRef, 'custom_title');
+                const docSnap = await window.getDocs(window.query(titleColRef, window.limit(1))); // Genel koleksiyondan limit 1 ile al
+                
+                if (!docSnap.empty && docSnap.docs[0].id === 'custom_title') { // Belge ID'sini kontrol et
                     customTitle = docSnap.docs[0].data().title || "Makbuz Oluşturma Sistemi";
                     document.getElementById('mainTitle').textContent = customTitle;
                     document.getElementById('customTitleInput').value = customTitle;
+                } else {
+                    // Eğer başlık belgesi yoksa veya yanlışsa, varsayılanı kullan ve kaydet
+                    customTitle = "Makbuz Oluşturma Sistemi";
+                    document.getElementById('mainTitle').textContent = customTitle;
+                    document.getElementById('customTitleInput').value = customTitle;
+                    await saveCustomTitleToFirestore(customTitle); // Varsayılanı kaydet
                 }
             } catch (e) {
                 console.error("Başlık Firestore'dan yüklenirken hata oluştu:", e);
@@ -623,6 +210,53 @@ const firebaseConfig = {
                 console.error("Ödemeler Firestore'dan alınırken hata oluştu:", error);
                 alert("Ödemeler yüklenirken bir hata oluştu.");
             });
+        }
+
+        // Firebase ve Auth'u başlat
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // window objesindeki db ve auth referanslarını güncelle
+            window.db = db;
+            window.auth = auth;
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    window.userId = userId; // window.userId'yi güncelle
+                    console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
+                    await loadPaymentsFromFirestore(); // Kimlik doğrulandıktan sonra ödemeleri yükle
+                    await loadCustomTitleFromFirestore(); // Başlığı yükle
+                    document.getElementById('savePaymentButton').disabled = false; // Firebase hazırsa butonu aktif et
+                } else {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            console.log("Canvas tarafından sağlanan token ile oturum açıldı.");
+                        } else {
+                            await signInAnonymously(auth);
+                            console.log("Anonim olarak oturum açıldı.");
+                        }
+                    } catch (error) {
+                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error);
+                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin.");
+                        userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
+                        window.userId = userId; // window.userId'yi güncelle
+                        await loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
+                        document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
+                    }
+                }
+            });
+        } else {
+            console.warn("Firebase yapılandırması bulunamadı. Çevrimdışı modda çalışılıyor.");
+            alert("Firebase aktif değil. Ödemeler kalıcı olarak kaydedilemeyecek. Lütfen Firebase kurulumunu kontrol edin.");
+            userId = crypto.randomUUID(); // Çevrimdışı kullanım için rastgele ID
+            window.userId = userId; // window.userId'yi güncelle
+            document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
+            // payments dizisi zaten global olarak tanımlı, yerel olarak çalışmaya devam edecek.
+            // loadRecentPayments() DOMContentLoaded içinde zaten çağrılıyor.
         }
 
 
