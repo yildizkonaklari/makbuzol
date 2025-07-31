@@ -29,24 +29,6 @@ const firebaseConfig = {
         let auth;
         let userId; // Kimliği doğrulanmış kullanıcı ID'si veya rastgele bir ID
 
-        // Global erişim için gerekli fonksiyonları window objesine ekle
-        // Bu atamalar, fonksiyonlar kullanılmadan önce yapılmalıdır.
-        window.db = db; // Başlangıçta undefined olabilir, Firebase başlatıldığında güncellenecek
-        window.auth = auth; // Başlangıçta undefined olabilir, Firebase başlatıldığında güncellenecek
-        window.appId = appId;
-        window.userId = userId; // Henüz tanımlanmamış olabilir, onAuthStateChanged içinde güncellenecek
-        window.addDoc = addDoc;
-        window.collection = collection;
-        window.query = query;
-        window.orderBy = orderBy;
-        window.limit = limit;
-        window.onSnapshot = onSnapshot;
-        window.deleteDoc = deleteDoc;
-        window.doc = doc;
-        window.getDocs = getDocs;
-        window.runTransaction = runTransaction;
-        window.setDoc = setDoc;
-
         // Ödemeleri geçici olarak saklayacak dizi
         let payments = [];
         // Özel başlık
@@ -59,15 +41,17 @@ const firebaseConfig = {
         // Global variable to store the payment data for the currently displayed receipt
         let currentReceiptForShare = null;
 
+        // --- Fonksiyon Tanımlamaları ---
+        // Bu fonksiyonlar, DOM'a erişmeden önce tanımlanmalıdır.
+        // DOM'a erişen kısımlar DOMContentLoaded içinde çağrılacaktır.
+
         // Makbuz numarası oluşturma fonksiyonu
-        // Firestore'dan son numarayı okur ve günceller
         async function generateReceiptId() {
             const db = window.db;
             const appId = window.appId;
 
             if (!db) {
                 console.warn("Firestore başlatılmadı. Yerel makbuz ID'si oluşturuluyor.");
-                // Fallback to local storage logic if Firestore is not available
                 let lastReceiptNumber = parseInt(localStorage.getItem('lastReceiptNumber')) || 999;
                 let lastReceiptMonthYear = localStorage.getItem('lastReceiptMonthYear') || '';
 
@@ -92,7 +76,7 @@ const firebaseConfig = {
             try {
                 const newReceiptId = await window.runTransaction(db, async (transaction) => {
                     const counterDoc = await transaction.get(counterRef);
-                    let currentCounter = 999; // Varsayılan değer, eğer sayaç yoksa 1000'den başlar
+                    let currentCounter = 999;
                     let storedMonth = -1;
                     let storedYear = -1;
 
@@ -104,11 +88,9 @@ const firebaseConfig = {
                     }
 
                     if (storedMonth !== currentMonth || storedYear !== currentYear) {
-                        // Yeni ay/yıl, sayacı sıfırla
                         currentCounter = 1000;
                         transaction.set(counterRef, { lastNumber: 1000, month: currentMonth, year: currentYear });
                     } else {
-                        // Aynı ay/yıl, sayacı artır
                         currentCounter++;
                         transaction.update(counterRef, { lastNumber: currentCounter });
                     }
@@ -118,7 +100,7 @@ const firebaseConfig = {
             } catch (e) {
                 console.error("Makbuz ID oluşturma başarısız oldu:", e);
                 alert("Makbuz numarası oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.");
-                return Date.now(); // Firestore hatası durumunda zaman damgası kullan
+                return Date.now();
             }
         }
 
@@ -126,7 +108,7 @@ const firebaseConfig = {
         async function loadCustomTitleFromFirestore() {
             const db = window.db;
             const appId = window.appId;
-            const titleColRef = window.collection(db, `artifacts/${appId}/public/data/settings`); // Koleksiyon referansı
+            const titleColRef = window.collection(db, `artifacts/${appId}/public/data/settings`);
 
             if (!db) {
                 console.warn("Firestore başlatılmadı. Başlık yerel olarak kalacak.");
@@ -134,21 +116,24 @@ const firebaseConfig = {
             }
 
             try {
-                // Sadece 'custom_title' belgesini hedefle
-                const titleDocRef = window.doc(titleColRef, 'custom_title');
-                const docSnap = await window.getDocs(window.query(titleColRef, window.limit(1))); // Genel koleksiyondan limit 1 ile al
+                const docSnap = await window.getDocs(window.query(titleColRef, window.limit(1)));
                 
-                if (!docSnap.empty && docSnap.docs[0].id === 'custom_title') { // Belge ID'sini kontrol et
+                if (!docSnap.empty && docSnap.docs[0].id === 'custom_title') {
                     customTitle = docSnap.docs[0].data().title || "Makbuz Oluşturma Sistemi";
-                    document.getElementById('mainTitle').textContent = customTitle;
-                    document.getElementById('customTitleInput').value = customTitle;
+                    // DOM elementleri DOMContentLoaded içinde hazırlandığı için burada doğrudan erişim güvenli değil.
+                    // Bu değerler DOMContentLoaded içindeki ilgili elementlere atanacaktır.
                 } else {
-                    // Eğer başlık belgesi yoksa veya yanlışsa, varsayılanı kullan ve kaydet
-                    customTitle = "Makbuz Oluşturma Sistemi";
-                    document.getElementById('mainTitle').textContent = customTitle;
-                    document.getElementById('customTitleInput').value = customTitle;
+                    customTitle = "Makbuz Oluşturma Sistemi"; // Varsayılanı kullan
                     await saveCustomTitleToFirestore(customTitle); // Varsayılanı kaydet
                 }
+                // Başlık güncellendikten sonra DOM'u güncelle
+                if (document.getElementById('mainTitle')) {
+                    document.getElementById('mainTitle').textContent = customTitle;
+                }
+                if (document.getElementById('customTitleInput')) {
+                    document.getElementById('customTitleInput').value = customTitle;
+                }
+
             } catch (e) {
                 console.error("Başlık Firestore'dan yüklenirken hata oluştu:", e);
             }
@@ -166,7 +151,6 @@ const firebaseConfig = {
             }
 
             try {
-                // Firestore'da tek bir başlık belgesi tutmak için setDoc kullan
                 await window.setDoc(titleRef, { title: newTitle });
                 console.log("Başlık Firestore'a kaydedildi:", newTitle);
             } catch (e) {
@@ -179,7 +163,7 @@ const firebaseConfig = {
         function loadPaymentsFromFirestore() {
             const db = window.db;
             const appId = window.appId;
-            const allPaymentsModal = document.getElementById('allPaymentsModal');
+            const allPaymentsModal = document.getElementById('allPaymentsModal'); // DOMContentLoaded içinde tanımlanacak
 
             if (!db) {
                 console.warn("Firestore başlatılmadı. Ödemeler Firestore'dan yüklenemiyor.");
@@ -188,21 +172,18 @@ const firebaseConfig = {
             }
 
             const paymentsColRef = window.collection(db, `artifacts/${appId}/public/data/payments`);
-            // fullDate ISO string olarak saklandığı için sıralama yapılabilir
             const q = window.query(paymentsColRef, window.orderBy('fullDate', 'desc'));
 
             window.onSnapshot(q, (snapshot) => {
-                payments = []; // Mevcut ödemeleri temizle
+                payments = [];
                 snapshot.forEach((docItem) => {
                     const data = docItem.data();
-                    // fullDate ISO string'den Date objesine dönüştür
                     data.fullDate = data.fullDate ? new Date(data.fullDate) : new Date();
-                    data.firestoreId = docItem.id; // Firestore belge ID'sini sakla
+                    data.firestoreId = docItem.id;
                     payments.push(data);
                 });
-                loadRecentPayments(); // Son ödemeler ekranını güncelle
-                // Eğer tüm ödemeler modalı açıksa, onu da güncelle
-                if (!allPaymentsModal.classList.contains('hidden')) {
+                loadRecentPayments();
+                if (allPaymentsModal && !allPaymentsModal.classList.contains('hidden')) { // Modalın varlığını kontrol et
                     loadAllPayments();
                 }
             }, (error) => {
@@ -211,7 +192,412 @@ const firebaseConfig = {
             });
         }
 
-        // Firebase ve Auth'u başlat
+        // Son eklenen ödemeleri yükle (DOM'a bağımlı)
+        function loadRecentPayments() {
+            const recentPaymentsDiv = document.getElementById('recentPayments');
+            const noPaymentsMessage = document.getElementById('noPaymentsMessage');
+
+            if (!recentPaymentsDiv || !noPaymentsMessage) return; // Elementler hazır değilse çık
+
+            recentPaymentsDiv.innerHTML = '';
+            if (payments.length === 0) {
+                noPaymentsMessage.classList.remove('hidden');
+            } else {
+                noPaymentsMessage.classList.add('hidden');
+                payments.slice(0, 5).forEach(payment => {
+                    const paymentItem = document.createElement('div');
+                    paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4');
+                    paymentItem.innerHTML = `
+                        <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
+                        <p class="text-gray-700"><strong>Çocuk:</strong> ${payment.childName}</p>
+                        <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
+                        <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
+                        <p class="text-gray-700"><strong>Ödeme Şekli:</strong> ${payment.paymentMethod}</p>
+                        <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
+                    `;
+                    recentPaymentsDiv.appendChild(paymentItem);
+                });
+            }
+        }
+
+        // Formu temizle (DOM'a bağımlı)
+        function clearForm() {
+            document.getElementById('payerName').value = '';
+            document.getElementById('childName').value = '';
+            document.getElementById('paymentDescription').value = '';
+            document.getElementById('paymentAmount').value = '';
+            document.getElementById('phoneNumber').value = '';
+            document.getElementById('paymentMethod').value = 'Nakit';
+        }
+
+        // Makbuzu HTML olarak oluştur ve göster (DOM'a bağımlı)
+        function displayReceipt(payment) {
+            const receiptDisplay = document.getElementById('receiptDisplay');
+            if (!receiptDisplay) return; // Element hazır değilse çık
+
+            receiptDisplay.innerHTML = `
+                <h3 class="text-2xl font-bold mb-4 text-gray-800">${customTitle}</h3>
+                <div class="mb-4">
+                    <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
+                    <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
+                </div>
+                <div class="mb-4">
+                    <p class="text-lg font-semibold text-gray-700 mb-2">Ödeyen Bilgileri:</p>
+                    <p class="receipt-line"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
+                    <p class="receipt-line"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
+                    ${payment.childName !== 'Belirtilmedi' ? `<p class="receipt-line"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
+                </div>
+                <div class="mb-4">
+                    <p class="text-lg font-semibold text-gray-700 mb-2">Ödeme Bilgileri:</p>
+                    <p class="receipt-line"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
+                    <p class="receipt-line"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
+                </div>
+                <div class="receipt-total text-xl font-bold text-gray-900">
+                    <p class="receipt-line"><span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span></p>
+                </div>
+                <p class="receipt-footer text-gray-600 mt-6">Teşekkür ederiz!</p>
+            `;
+        }
+
+        // Function to generate receipt HTML for PDF/Print
+        function getReceiptHtmlContent(payment, isForPrint = false) {
+            const cuttingLineHtml = isForPrint ? `<div style="text-align:center; margin: 20px 0; font-size: 0.8em; color: #6b7280;">✂️ KESME ÇİZGİSİ ✂️</div>` : '';
+            return `
+                <div style="width: 148mm; margin: 0 auto; border: 1px dashed #9ca3af; padding: 10mm; box-sizing: border-box; page-break-inside: avoid;">
+                    <h3 style="text-align: center; font-weight: bold; font-size: 1.2rem; margin-bottom: 0.5rem; color: #1f2937;">${customTitle}</h3>
+                    <div style="margin-bottom: 0.5rem;">
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
+                    </div>
+                    <div style="margin-bottom: 0.5rem;">
+                        <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeyen Bilgileri:</p>
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
+                        ${payment.childName !== 'Belirtilmedi' ? `<p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
+                    </div>
+                    <div style="margin-bottom: 0.5rem;">
+                        <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeme Bilgileri:</p>
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
+                        <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
+                    </div>
+                    <div style="font-weight: bold; font-size: 0.9rem; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; display: flex; justify-content: space-between;">
+                        <span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span>
+                    </div>
+                    <p style="text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem;">Teşekkür ederiz!</p>
+                </div>
+                ${cuttingLineHtml}
+            `;
+        }
+
+        // Function to handle PDF generation and printing
+        async function generatePdfAndOrPrint(action, paymentData) {
+            if (!paymentData) {
+                alert('PDF oluşturulacak veya yazdırılacak bir makbuz bulunmuyor.');
+                return;
+            }
+
+            const tempPdfContainer = document.createElement('div');
+            tempPdfContainer.style.position = 'absolute';
+            tempPdfContainer.style.left = '-9999px';
+            tempPdfContainer.style.top = '-9999px';
+            tempPdfContainer.style.width = '210mm';
+            tempPdfContainer.style.height = '297mm';
+            tempPdfContainer.style.overflow = 'hidden';
+            tempPdfContainer.style.visibility = 'hidden';
+            tempPdfContainer.style.opacity = '0';
+            document.body.appendChild(tempPdfContainer);
+
+            if (action === 'download') {
+                tempPdfContainer.innerHTML = getReceiptHtmlContent(paymentData);
+                tempPdfContainer.style.visibility = 'visible';
+                tempPdfContainer.style.opacity = '1';
+
+                const opt = {
+                    margin:       10,
+                    filename:     `makbuz_${paymentData.id}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
+                    jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
+                };
+                
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                try {
+                    await html2pdf().set(opt).from(tempPdfContainer).save();
+                } catch (error) {
+                    console.error("PDF oluşturulurken hata oluştu:", error);
+                    alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
+                } finally {
+                    document.body.removeChild(tempPdfContainer);
+                }
+
+            } else if (action === 'print') {
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write('<html><head><title>Makbuz Yazdır</title>');
+                printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
+                printWindow.document.write('<style>');
+                printWindow.document.write(`
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                    body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
+                    .receipt-item-for-print {
+                        width: 148mm;
+                        border: 1px dashed #9ca3af;
+                        padding: 10mm;
+                        box-sizing: border-box;
+                        page-break-inside: avoid;
+                    }
+                    .receipt-item-for-print.cutting-line {
+                        border-bottom: 1px dashed #6b7280;
+                        padding-bottom: 15mm;
+                        margin-bottom: 15mm;
+                    }
+                    .receipt-item-for-print h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
+                    .receipt-item-for-print p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
+                    .receipt-item-for-print .receipt-line { display: flex; justify-content: space-between; }
+                    .receipt-item-for-print .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
+                    .receipt-item-for-print .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
+                `);
+                printWindow.document.write('</style>');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(getReceiptHtmlContent(paymentData, true).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
+                printWindow.document.write(getReceiptHtmlContent(paymentData).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+            }
+        }
+
+        // Raporu PDF olarak indirme fonksiyonu
+        async function downloadMonthlyReportPdf(month, year, filteredPayments) {
+            if (filteredPayments.length === 0) {
+                alert('Bu ay için indirilecek ödeme bulunmamaktadır.');
+                return;
+            }
+
+            const tempReportContainer = document.createElement('div');
+            tempReportContainer.style.position = 'absolute';
+            tempReportContainer.style.left = '-9999px';
+            tempReportContainer.style.top = '-9999px';
+            tempReportContainer.style.width = '210mm';
+            tempReportContainer.style.height = '297mm';
+            tempReportContainer.style.overflow = 'hidden';
+            tempReportContainer.style.visibility = 'hidden';
+            tempReportContainer.style.opacity = '0';
+            document.body.appendChild(tempReportContainer);
+
+            let reportHtmlContent = `
+                <div style="font-family: 'Inter', sans-serif; padding: 20mm; box-sizing: border-box; width: 210mm; height: 297mm;">
+                    <h2 style="text-align: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #1f2937;">${document.getElementById('reportMonth').options[document.getElementById('reportMonth').selectedIndex].text} ${year} Ayı Ödeme Raporu</h2>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                        <thead>
+                            <tr style="background-color: #e5e7eb;">
+                                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Makbuz No</th>
+                                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeyen</th>
+                                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tutar (TL)</th>
+                                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tarih</th>
+                                <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeme Şekli</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            let totalAmount = 0;
+            filteredPayments.forEach(payment => {
+                totalAmount += payment.paymentAmount;
+                reportHtmlContent += `
+                    <tr>
+                        <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">#${payment.id}</td>
+                        <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.payerName}</td>
+                        <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentAmount.toFixed(2)}</td>
+                        <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentDate}</td>
+                        <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentMethod}</td>
+                    </tr>
+                `;
+            });
+            reportHtmlContent += `
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #f3f4f6;">
+                                <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold; font-size: 1rem;">Toplam Gelir:</td>
+                                <td style="border: 1px solid #d1d5db; padding: 8px; font-weight: bold; font-size: 1rem;">${totalAmount.toFixed(2)}</td>
+                                <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px;"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+
+            tempReportContainer.innerHTML = reportHtmlContent;
+            tempReportContainer.style.visibility = 'visible';
+            tempReportContainer.style.opacity = '1';
+
+            const opt = {
+                margin:       10,
+                filename:     `aylik_rapor_${document.getElementById('reportMonth').options[document.getElementById('reportMonth').selectedIndex].text.toLowerCase()}_${year}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                await html2pdf().set(opt).from(tempReportContainer).save();
+            } catch (error) {
+                console.error("Aylık rapor PDF oluşturulurken hata oluştu:", error);
+                alert("Aylık rapor PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
+            } finally {
+                document.body.removeChild(tempReportContainer);
+            }
+        }
+
+        // WhatsApp ile paylaş (metin olarak)
+        function sendWhatsAppReceipt(payment) {
+            const message = `*${customTitle}*\n` +
+                            `-----------------------------------\n` +
+                            `Makbuz No: #${payment.id}\n` +
+                            `Tarih: ${payment.paymentDate} ${payment.paymentTime}\n` +
+                            `Ödeyen Kişi: ${payment.payerName}\n` +
+                            `Çocuk Adı: ${payment.childName}\n` +
+                            `Ödeme Tutarı: ${payment.paymentAmount.toFixed(2)} TL\n` +
+                            `Ödeme Açıklaması: ${payment.paymentDescription}\n` +
+                            `Ödeme Şekli: ${payment.paymentMethod}\n` +
+                            `-----------------------------------\n` +
+                            `Teşekkür ederiz!`;
+
+            let whatsappNum = payment.phoneNumber.replace(/\s/g, '');
+            if (whatsappNum.startsWith('0')) {
+                whatsappNum = '90' + whatsappNum.substring(1);
+            } else if (!whatsappNum.startsWith('90')) {
+                whatsappNum = '90' + whatsappNum;
+            }
+            
+            const whatsappUrl = `https://wa.me/${whatsappNum}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // E-posta ile paylaş
+        function sendEmailReceipt(payment) {
+            const subject = encodeURIComponent(`${customTitle} - Makbuz No: #${payment.id}`);
+            const body = encodeURIComponent(
+                `Sayın ${payment.payerName},\n\n` +
+                `Ödemeniz başarıyla alınmıştır. İşte makbuz bilgileriniz:\n\n` +
+                `-----------------------------------\n` +
+                `Makbuz No: #${payment.id}\n` +
+                `Tarih: ${payment.paymentDate} ${payment.paymentTime}\n` +
+                `Ödeyen Kişi: ${payment.payerName}\n` +
+                `Çocuk Adı: ${payment.childName}\n` +
+                `Ödeme Tutarı: ${payment.paymentAmount.toFixed(2)} TL\n` +
+                `Ödeme Açıklaması: ${payment.paymentDescription}\n` +
+                `Ödeme Şekli: ${payment.paymentMethod}\n` +
+                `-----------------------------------\n\n` +
+                `Teşekkür ederiz!`
+            );
+            window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+        }
+
+        // Paylaşım seçenekleri modalını göster
+        function showShareOptionsModal(payment) {
+            currentReceiptForShare = payment;
+            const shareOptionsModal = document.getElementById('shareOptionsModal');
+            if (shareOptionsModal) shareOptionsModal.classList.remove('hidden');
+        }
+
+        // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
+        function showSection(sectionId) {
+            const paymentForm = document.getElementById('paymentForm');
+            const receiptDisplay = document.getElementById('receiptDisplay');
+            const receiptActions = document.getElementById('receiptActions');
+            const allPaymentsModal = document.getElementById('allPaymentsModal');
+            const settingsModal = document.getElementById('settingsModal');
+            const shareOptionsModal = document.getElementById('shareOptionsModal');
+            const addPaymentButton = document.getElementById('addPaymentButton');
+
+            if (paymentForm) paymentForm.classList.add('hidden');
+            if (receiptDisplay) receiptDisplay.classList.add('hidden');
+            if (receiptActions) receiptActions.classList.add('hidden');
+            if (allPaymentsModal) allPaymentsModal.classList.add('hidden');
+            if (settingsModal) settingsModal.classList.add('hidden');
+            if (shareOptionsModal) shareOptionsModal.classList.add('hidden');
+
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) targetSection.classList.remove('hidden');
+
+            if (addPaymentButton) {
+                if (sectionId === 'paymentForm') {
+                    addPaymentButton.classList.add('hidden');
+                } else {
+                    addPaymentButton.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Tüm ödemeleri modalda listele (DOM'a bağımlı)
+        function loadAllPayments() {
+            const allPaymentsList = document.getElementById('allPaymentsList');
+            const noAllPaymentsMessage = document.getElementById('noAllPaymentsMessage');
+
+            if (!allPaymentsList || !noAllPaymentsMessage) return;
+
+            allPaymentsList.innerHTML = '';
+            if (payments.length === 0) {
+                noAllPaymentsMessage.classList.remove('hidden');
+            } else {
+                noAllPaymentsMessage.classList.add('hidden');
+                payments.forEach(payment => {
+                    const paymentItem = document.createElement('div');
+                    paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4', 'flex', 'flex-col', 'justify-between');
+                    paymentItem.innerHTML = `
+                        <div>
+                            <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
+                            <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
+                            <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
+                            <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
+                        </div>
+                    `;
+                    allPaymentsList.appendChild(paymentItem);
+                });
+            }
+        }
+
+        // Ay ve Yıl Seçicilerini Doldur (DOM'a bağımlı)
+        function populateMonthYearSelectors() {
+            const reportMonthSelect = document.getElementById('reportMonth');
+            const reportYearSelect = document.getElementById('reportYear');
+
+            if (!reportMonthSelect || !reportYearSelect) return;
+
+            reportMonthSelect.innerHTML = '';
+            reportYearSelect.innerHTML = '';
+
+            const months = [
+                "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+            ];
+            const currentYear = new Date().getFullYear();
+
+            months.forEach((month, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = month;
+                reportMonthSelect.appendChild(option);
+            });
+
+            for (let i = currentYear - 5; i <= currentYear + 1; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i === currentYear) {
+                    option.selected = true;
+                }
+                reportYearSelect.appendChild(option);
+            }
+            reportMonthSelect.value = new Date().getMonth();
+        }
+
+        // --- Firebase Başlatma ---
+        // Bu kısım, DOMContentLoaded'dan önce çalışır ve Firebase objelerini hazırlar.
+        // DOM'a bağımlı fonksiyonlar burada çağrılmamalıdır.
         if (firebaseConfig) {
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
@@ -224,11 +610,12 @@ const firebaseConfig = {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    window.userId = userId; // window.userId'yi güncelle
+                    window.userId = userId;
                     console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
-                    await loadPaymentsFromFirestore(); // Kimlik doğrulandıktan sonra ödemeleri yükle
-                    await loadCustomTitleFromFirestore(); // Başlığı yükle
-                    document.getElementById('savePaymentButton').disabled = false; // Firebase hazırsa butonu aktif et
+                    // DOM elementleri hazır olduğunda bu fonksiyonlar çağrılacak
+                    // loadPaymentsFromFirestore(); // DOMContentLoaded içinde çağrılacak
+                    // loadCustomTitleFromFirestore(); // DOMContentLoaded içinde çağrılacak
+                    // document.getElementById('savePaymentButton').disabled = false; // DOMContentLoaded içinde ayarlanacak
                 } else {
                     try {
                         if (initialAuthToken) {
@@ -241,24 +628,43 @@ const firebaseConfig = {
                     } catch (error) {
                         console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error);
                         alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin.");
-                        userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
-                        window.userId = userId; // window.userId'yi güncelle
-                        await loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
-                        document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
+                        userId = crypto.randomUUID();
+                        window.userId = userId;
+                        // loadPaymentsFromFirestore(); // DOMContentLoaded içinde çağrılacak
+                        // document.getElementById('savePaymentButton').disabled = true; // DOMContentLoaded içinde ayarlanacak
                     }
                 }
             });
         } else {
             console.warn("Firebase yapılandırması bulunamadı. Çevrimdışı modda çalışılıyor.");
             alert("Firebase aktif değil. Ödemeler kalıcı olarak kaydedilemeyecek. Lütfen Firebase kurulumunu kontrol edin.");
-            userId = crypto.randomUUID(); // Çevrimdışı kullanım için rastgele ID
-            window.userId = userId; // window.userId'yi güncelle
-            document.getElementById('savePaymentButton').disabled = true; // Firebase aktif değilse butonu devre dışı bırak
-            // payments dizisi zaten global olarak tanımlı, yerel olarak çalışmaya devam edecek.
-            // loadRecentPayments() DOMContentLoaded içinde zaten çağrılıyor.
+            userId = crypto.randomUUID();
+            window.userId = userId;
+            // document.getElementById('savePaymentButton').disabled = true; // DOMContentLoaded içinde ayarlanacak
         }
 
+        // --- Global Fonksiyon Atamaları (Firebase modülleri yüklendikten sonra) ---
+        // Bu atamalar, fonksiyonlar kullanılmadan önce yapılmalıdır.
+        window.generateReceiptId = generateReceiptId;
+        window.loadCustomTitleFromFirestore = loadCustomTitleFromFirestore;
+        window.saveCustomTitleToFirestore = saveCustomTitleToFirestore;
+        window.loadPaymentsFromFirestore = loadPaymentsFromFirestore;
+        window.loadRecentPayments = loadRecentPayments;
+        window.clearForm = clearForm;
+        window.displayReceipt = displayReceipt;
+        window.getReceiptHtmlContent = getReceiptHtmlContent;
+        window.generatePdfAndOrPrint = generatePdfAndOrPrint;
+        window.downloadMonthlyReportPdf = downloadMonthlyReportPdf;
+        window.sendWhatsAppReceipt = sendWhatsAppReceipt;
+        window.sendEmailReceipt = sendEmailReceipt;
+        window.showShareOptionsModal = showShareOptionsModal;
+        window.showSection = showSection;
+        window.loadAllPayments = loadAllPayments;
+        window.populateMonthYearSelectors = populateMonthYearSelectors;
 
+
+        // --- DOMContentLoaded Olay Dinleyicisi ---
+        // Tüm DOM manipülasyonları ve olay dinleyicileri buraya taşındı.
         document.addEventListener('DOMContentLoaded', () => {
             const mainTitle = document.getElementById('mainTitle');
             const customTitleInput = document.getElementById('customTitleInput');
@@ -273,7 +679,7 @@ const firebaseConfig = {
             const noPaymentsMessage = document.getElementById('noPaymentsMessage');
             const receiptDisplay = document.getElementById('receiptDisplay');
             const receiptActions = document.getElementById('receiptActions');
-            const shareMainButton = document.getElementById('shareMainButton'); // Paylaş butonu
+            const shareMainButton = document.getElementById('shareMainButton');
             const newPaymentButton = document.getElementById('newPaymentButton');
 
             const allPaymentsModal = document.getElementById('allPaymentsModal');
@@ -286,18 +692,18 @@ const firebaseConfig = {
             const reportMonthSelect = document.getElementById('reportMonth');
             const reportYearSelect = document.getElementById('reportYear');
             const generateReportButton = document.getElementById('generateReportButton');
-            const downloadReportPdfButton = document.getElementById('downloadReportPdfButton'); // Yeni rapor PDF butonu
+            const downloadReportPdfButton = document.getElementById('downloadReportPdfButton');
             const monthlyReportOutput = document.getElementById('monthlyReportOutput');
             const clearPaymentsButton = document.getElementById('clearPaymentsButton'); 
 
-            const shareOptionsModal = document.getElementById('shareOptionsModal'); // Paylaşım seçenekleri modalı
+            const shareOptionsModal = document.getElementById('shareOptionsModal');
             const closeShareOptionsModalButton = document.getElementById('closeShareOptionsModalButton');
-            const shareModalDownloadPdfButton = document.getElementById('shareModalDownloadPdfButton'); // PDF İndir butonu
+            const shareModalDownloadPdfButton = document.getElementById('shareModalDownloadPdfButton');
             const shareModalWhatsappButton = document.getElementById('shareModalWhatsappButton');
             const shareModalMailButton = document.getElementById('shareModalMailButton');
             const shareModalPrintButton = document.getElementById('shareModalPrintButton');
 
-            // Sayfa yüklendiğinde tüm modalları ve aksiyon alanlarını gizle
+            // Başlangıçta tüm modalları ve aksiyon alanlarını gizle
             allPaymentsModal.classList.add('hidden');
             settingsModal.classList.add('hidden');
             receiptActions.classList.add('hidden');
@@ -310,31 +716,20 @@ const firebaseConfig = {
             
             // Firebase başlatıldığında ödemeler ve başlık otomatik yüklenecek
             // Eğer Firebase config yoksa, yerel yükleme devreye girer.
-            if (!window.db) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
-                loadRecentPayments();
+            if (window.db) { // Firebase objesi tanımlıysa
+                // Firebase kimlik doğrulama durumu değiştiğinde bu fonksiyonlar çağrılacak
+                // İlk yüklemede de çağrılır.
+                window.loadPaymentsFromFirestore();
+                window.loadCustomTitleFromFirestore();
+                savePaymentButton.disabled = false; // Firebase hazırsa butonu aktif et
+            } else {
+                // Firebase aktif değilse, yerel yükleme yap ve butonu devre dışı bırak
+                window.loadRecentPayments();
+                savePaymentButton.disabled = true;
             }
 
 
-            // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
-            function showSection(sectionId) {
-                // Tüm ana içerik alanlarını gizle
-                paymentForm.classList.add('hidden');
-                receiptDisplay.classList.add('hidden');
-                receiptActions.classList.add('hidden');
-                allPaymentsModal.classList.add('hidden');
-                settingsModal.classList.add('hidden');
-                shareOptionsModal.classList.add('hidden'); // Paylaşım modalını da gizle
-
-                // İstenen bölümü göster
-                document.getElementById(sectionId).classList.remove('hidden');
-
-                // addPaymentButton'ın görünürlüğünü yönet
-                if (sectionId === 'paymentForm') {
-                    addPaymentButton.classList.add('hidden'); // Ödeme formu açıksa gizle
-                } else {
-                    addPaymentButton.classList.remove('hidden'); // Diğer bölümler açıksa göster
-                }
-            }
+            // --- Olay Dinleyicileri ---
 
             // Başlık ayarla
             setCustomTitleButton.addEventListener('click', async () => {
@@ -360,27 +755,25 @@ const firebaseConfig = {
 
             // Formu iptal et
             cancelPaymentButton.addEventListener('click', () => {
-                showSection('paymentForm'); // İptal edince ödeme formuna geri dön
+                showSection('paymentForm');
                 clearForm();
             });
 
             // Yeni ödeme ekle butonuna basınca formu tekrar aç
             newPaymentButton.addEventListener('click', () => {
-                showSection('paymentForm'); // Yeni ödeme ekle deyince ödeme formuna geri dön
-                clearForm(); // Formu temizle
+                showSection('paymentForm');
+                clearForm();
             });
 
             // Ödemeyi kaydet ve makbuz oluştur
-            savePaymentButton.addEventListener('click', async () => { // async eklendi
-                // Şifre kontrolü kaldırıldı
-                
+            savePaymentButton.addEventListener('click', async () => {
                 const payerName = document.getElementById('payerName').value.trim();
                 const childName = document.getElementById('childName').value.trim();
                 const paymentDescription = document.getElementById('paymentDescription').value.trim();
                 const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
                 const phoneNumber = document.getElementById('phoneNumber').value.trim();
                 const paymentMethod = document.getElementById('paymentMethod').value;
-                const paymentDate = new Date(); // Bugünün tarihi
+                const paymentDate = new Date();
 
                 if (!payerName || isNaN(paymentAmount) || paymentAmount <= 0 || !phoneNumber) {
                     alert('Lütfen tüm zorunlu alanları (Ödeme Yapan Kişi, Tutar, Telefon Numarası) doğru şekilde doldurun.');
@@ -388,7 +781,7 @@ const firebaseConfig = {
                 }
 
                 const paymentData = {
-                    id: await generateReceiptId(), // Benzersiz ID için yeni fonksiyonu kullan
+                    id: await generateReceiptId(),
                     payerName,
                     childName: childName || 'Belirtilmedi',
                     paymentDescription: paymentDescription || 'Yok',
@@ -397,347 +790,35 @@ const firebaseConfig = {
                     paymentMethod,
                     paymentDate: paymentDate.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
                     paymentTime: paymentDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-                    fullDate: paymentDate.toISOString() // Raporlama ve sıralama için ISO string olarak sakla
+                    fullDate: paymentDate.toISOString()
                 };
 
-                if (window.db && window.appId) { // Firebase başlatıldıysa
+                if (window.db && window.appId) {
                     try {
                         const docRef = await window.addDoc(window.collection(window.db, `artifacts/${window.appId}/public/data/payments`), paymentData);
                         console.log("Belge şu ID ile yazıldı: ", docRef.id);
-                        paymentData.firestoreId = docRef.id; // Firestore belge ID'sini sakla
+                        paymentData.firestoreId = docRef.id;
                     } catch (e) {
                         console.error("Belge eklenirken hata oluştu: ", e);
                         alert("Ödeme kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.");
-                        return; // Kaydetme başarısız olursa dur
+                        return;
                     }
                 } else {
-                    // Firebase yoksa yerel payments dizisine ekle
                     payments.unshift(paymentData);
                 }
 
-                loadRecentPayments(); // Ödemeleri yeniden yükle
-                clearForm(); // Formu temizle
+                loadRecentPayments();
+                clearForm();
                 
-                // Makbuzu göster ve aksiyon butonlarını göster
                 displayReceipt(paymentData);
-                showSection('receiptActions'); // Makbuz aksiyonlarını göster
-                receiptDisplay.classList.remove('hidden'); // Makbuz görüntüsünü göster
+                showSection('receiptActions');
+                receiptDisplay.classList.remove('hidden');
             });
-
-            // Son eklenen ödemeleri yükle
-            function loadRecentPayments() {
-                recentPaymentsDiv.innerHTML = ''; // Önceki ödemeleri temizle
-                if (payments.length === 0) {
-                    noPaymentsMessage.classList.remove('hidden');
-                } else {
-                    noPaymentsMessage.classList.add('hidden');
-                    // Sadece son 5 ödemeyi göster
-                    payments.slice(0, 5).forEach(payment => {
-                        const paymentItem = document.createElement('div');
-                        paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4');
-                        paymentItem.innerHTML = `
-                            <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
-                            <p class="text-gray-700"><strong>Çocuk:</strong> ${payment.childName}</p>
-                            <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
-                            <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
-                            <p class="text-gray-700"><strong>Ödeme Şekli:</strong> ${payment.paymentMethod}</p>
-                            <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
-                        `;
-                        recentPaymentsDiv.appendChild(paymentItem);
-                    });
-                }
-            }
-
-            // Formu temizle
-            function clearForm() {
-                document.getElementById('payerName').value = '';
-                document.getElementById('childName').value = '';
-                document.getElementById('paymentDescription').value = '';
-                document.getElementById('paymentAmount').value = '';
-                document.getElementById('phoneNumber').value = '';
-                document.getElementById('paymentMethod').value = 'Nakit';
-            }
-
-            // Makbuzu HTML olarak oluştur ve göster
-            function displayReceipt(payment) {
-                receiptDisplay.innerHTML = `
-                    <h3 class="text-2xl font-bold mb-4 text-gray-800">${customTitle}</h3>
-                    <div class="mb-4">
-                        <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
-                        <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
-                    </div>
-                    <div class="mb-4">
-                        <p class="text-lg font-semibold text-gray-700 mb-2">Ödeyen Bilgileri:</p>
-                        <p class="receipt-line"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
-                        <p class="receipt-line"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
-                        ${payment.childName !== 'Belirtilmedi' ? `<p class="receipt-line"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
-                    </div>
-                    <div class="mb-4">
-                        <p class="text-lg font-semibold text-gray-700 mb-2">Ödeme Bilgileri:</p>
-                        <p class="receipt-line"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
-                        <p class="receipt-line"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
-                    </div>
-                    <div class="receipt-total text-xl font-bold text-gray-900">
-                        <p class="receipt-line"><span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span></p>
-                    </div>
-                    <p class="receipt-footer text-gray-600 mt-6">Teşekkür ederiz!</p>
-                `;
-            }
-
-            // Function to generate receipt HTML for PDF/Print
-            function getReceiptHtmlContent(payment, isForPrint = false) {
-                const cuttingLineHtml = isForPrint ? `<div style="text-align:center; margin: 20px 0; font-size: 0.8em; color: #6b7280;">✂️ KESME ÇİZGİSİ ✂️</div>` : '';
-                return `
-                    <div style="width: 148mm; margin: 0 auto; border: 1px dashed #9ca3af; padding: 10mm; box-sizing: border-box; page-break-inside: avoid;">
-                        <h3 style="text-align: center; font-weight: bold; font-size: 1.2rem; margin-bottom: 0.5rem; color: #1f2937;">${customTitle}</h3>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
-                        </div>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeyen Bilgileri:</p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
-                            ${payment.childName !== 'Belirtilmedi' ? `<p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
-                        </div>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeme Bilgileri:</p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
-                        </div>
-                        <div style="font-weight: bold; font-size: 0.9rem; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; display: flex; justify-content: space-between;">
-                            <span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span>
-                        </div>
-                        <p style="text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem;">Teşekkür ederiz!</p>
-                    </div>
-                    ${cuttingLineHtml}
-                `;
-            }
-
-            // Function to handle PDF generation and printing
-            async function generatePdfAndOrPrint(action, paymentData) {
-                if (!paymentData) {
-                    alert('PDF oluşturulacak veya yazdırılacak bir makbuz bulunmuyor.');
-                    return;
-                }
-
-                // Dinamik olarak geçici bir konteyner oluştur
-                const tempPdfContainer = document.createElement('div');
-                // Stil ekle: A4 boyutunda, ekran dışında, görünmez
-                tempPdfContainer.style.position = 'absolute';
-                tempPdfContainer.style.left = '-9999px';
-                tempPdfContainer.style.top = '-9999px';
-                tempPdfContainer.style.width = '210mm'; // A4 genişliği
-                tempPdfContainer.style.height = '297mm'; // A4 yüksekliği
-                tempPdfContainer.style.overflow = 'hidden';
-                tempPdfContainer.style.visibility = 'hidden';
-                tempPdfContainer.style.opacity = '0';
-                document.body.appendChild(tempPdfContainer);
-
-                if (action === 'download') {
-                    tempPdfContainer.innerHTML = getReceiptHtmlContent(paymentData);
-                    tempPdfContainer.style.visibility = 'visible';
-                    tempPdfContainer.style.opacity = '1';
-
-                    const opt = {
-                        margin:       10,
-                        filename:     `makbuz_${paymentData.id}.pdf`,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
-                        jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
-                    };
-                    
-                    await new Promise(resolve => setTimeout(resolve, 100)); // Gecikme
-
-                    try {
-                        await html2pdf().set(opt).from(tempPdfContainer).save();
-                    } catch (error) {
-                        console.error("PDF oluşturulurken hata oluştu:", error);
-                        alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
-                    } finally {
-                        document.body.removeChild(tempPdfContainer); // Geçici div'i kaldır
-                    }
-
-                } else if (action === 'print') {
-                    const printWindow = window.open('', '_blank');
-                    printWindow.document.write('<html><head><title>Makbuz Yazdır</title>');
-                    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
-                    printWindow.document.write('<style>');
-                    printWindow.document.write(`
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-                        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
-                        /* Makbuz öğesi için genel stil */
-                        .receipt-item-for-print {
-                            width: 148mm; /* A5 genişliği */
-                            border: 1px dashed #9ca3af;
-                            padding: 10mm;
-                            box-sizing: border-box;
-                            page-break-inside: avoid;
-                        }
-                        /* İlk makbuzdan sonra kesme çizgisi ve boşluk */
-                        .receipt-item-for-print.cutting-line {
-                            border-bottom: 1px dashed #6b7280; /* Kesme çizgisi */
-                            padding-bottom: 15mm;
-                            margin-bottom: 15mm;
-                        }
-                        .receipt-item-for-print h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
-                        .receipt-item-for-print p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
-                        .receipt-item-for-print .receipt-line { display: flex; justify-content: space-between; }
-                        .receipt-item-for-print .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
-                        .receipt-item-for-print .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
-                    `);
-                    printWindow.document.write('</style>');
-                    printWindow.document.write('</head><body>');
-                    // İlk makbuz ve kesme çizgisi
-                    printWindow.document.write(getReceiptHtmlContent(paymentData, true).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
-                    // İkinci makbuz
-                    printWindow.document.write(getReceiptHtmlContent(paymentData).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
-                    printWindow.document.write('</body></html>');
-                    printWindow.document.close();
-                    printWindow.focus();
-                    printWindow.print();
-                }
-            }
-
-            // Raporu PDF olarak indirme fonksiyonu
-            async function downloadMonthlyReportPdf(month, year, filteredPayments) {
-                if (filteredPayments.length === 0) {
-                    alert('Bu ay için indirilecek ödeme bulunmamaktadır.');
-                    return;
-                }
-
-                const tempReportContainer = document.createElement('div');
-                tempReportContainer.style.position = 'absolute';
-                tempReportContainer.style.left = '-9999px';
-                tempReportContainer.style.top = '-9999px';
-                tempReportContainer.style.width = '210mm'; // A4 genişliği
-                tempReportContainer.style.height = '297mm'; // A4 yüksekliği
-                tempReportContainer.style.overflow = 'hidden';
-                tempReportContainer.style.visibility = 'hidden';
-                tempReportContainer.style.opacity = '0';
-                document.body.appendChild(tempReportContainer);
-
-                let reportHtmlContent = `
-                    <div style="font-family: 'Inter', sans-serif; padding: 20mm; box-sizing: border-box; width: 210mm; height: 297mm;">
-                        <h2 style="text-align: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #1f2937;">${reportMonthSelect.options[reportMonthSelect.selectedIndex].text} ${year} Ayı Ödeme Raporu</h2>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
-                            <thead>
-                                <tr style="background-color: #e5e7eb;">
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Makbuz No</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeyen</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tutar (TL)</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tarih</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeme Şekli</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                let totalAmount = 0;
-                filteredPayments.forEach(payment => {
-                    totalAmount += payment.paymentAmount;
-                    reportHtmlContent += `
-                        <tr>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">#${payment.id}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.payerName}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentAmount.toFixed(2)}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentDate}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentMethod}</td>
-                        </tr>
-                    `;
-                });
-                reportHtmlContent += `
-                            </tbody>
-                            <tfoot>
-                                <tr style="background-color: #f3f4f6;">
-                                    <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold; font-size: 1rem;">Toplam Gelir:</td>
-                                    <td style="border: 1px solid #d1d5db; padding: 8px; font-weight: bold; font-size: 1rem;">${totalAmount.toFixed(2)}</td>
-                                    <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px;"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                `;
-
-                tempReportContainer.innerHTML = reportHtmlContent;
-                tempReportContainer.style.visibility = 'visible';
-                tempReportContainer.style.opacity = '1';
-
-                const opt = {
-                    margin:       10,
-                    filename:     `aylik_rapor_${reportMonthSelect.options[reportMonthSelect.selectedIndex].text.toLowerCase()}_${year}.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' } // A4 boyutunda dikey
-                };
-
-                await new Promise(resolve => setTimeout(resolve, 100)); // Gecikme
-
-                try {
-                    await html2pdf().set(opt).from(tempReportContainer).save();
-                } catch (error) {
-                    console.error("Aylık rapor PDF oluşturulurken hata oluştu:", error);
-                    alert("Aylık rapor PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
-                } finally {
-                    document.body.removeChild(tempReportContainer); // Geçici div'i kaldır
-                }
-            }
-
-
-            // WhatsApp ile paylaş (metin olarak)
-            function sendWhatsAppReceipt(payment) {
-                const message = `*${customTitle}*\n` +
-                                `-----------------------------------\n` +
-                                `Makbuz No: #${payment.id}\n` +
-                                `Tarih: ${payment.paymentDate} ${payment.paymentTime}\n` +
-                                `Ödeyen Kişi: ${payment.payerName}\n` +
-                                `Çocuk Adı: ${payment.childName}\n` +
-                                `Ödeme Tutarı: ${payment.paymentAmount.toFixed(2)} TL\n` +
-                                `Ödeme Açıklaması: ${payment.paymentDescription}\n` +
-                                `Ödeme Şekli: ${payment.paymentMethod}\n` +
-                                `-----------------------------------\n` +
-                                `Teşekkür ederiz!`;
-
-                let whatsappNum = payment.phoneNumber.replace(/\s/g, ''); // Boşlukları kaldır
-                if (whatsappNum.startsWith('0')) {
-                    whatsappNum = '90' + whatsappNum.substring(1); // 0'ı kaldırıp 90 ekle
-                } else if (!whatsappNum.startsWith('90')) {
-                    whatsappNum = '90' + whatsappNum; // Başında 90 yoksa ekle (Basit varsayım)
-                }
-                
-                const whatsappUrl = `https://wa.me/${whatsappNum}?text=${encodeURIComponent(message)}`;
-                window.open(whatsappUrl, '_blank');
-            }
-
-            // E-posta ile paylaş
-            function sendEmailReceipt(payment) {
-                const subject = encodeURIComponent(`${customTitle} - Makbuz No: #${payment.id}`);
-                const body = encodeURIComponent(
-                    `Sayın ${payment.payerName},\n\n` +
-                    `Ödemeniz başarıyla alınmıştır. İşte makbuz bilgileriniz:\n\n` +
-                    `-----------------------------------\n` +
-                    `Makbuz No: #${payment.id}\n` +
-                    `Tarih: ${payment.paymentDate} ${payment.paymentTime}\n` +
-                    `Ödeyen Kişi: ${payment.payerName}\n` +
-                    `Çocuk Adı: ${payment.childName}\n` +
-                    `Ödeme Tutarı: ${payment.paymentAmount.toFixed(2)} TL\n` +
-                    `Ödeme Açıklaması: ${payment.paymentDescription}\n` +
-                    `Ödeme Şekli: ${payment.paymentMethod}\n` +
-                    `-----------------------------------\n\n` +
-                    `Teşekkür ederiz!`
-                );
-                window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
-            }
-
-            // Paylaşım seçenekleri modalını göster
-            function showShareOptionsModal(payment) {
-                currentReceiptForShare = payment; // Paylaşılacak makbuzu global değişkene ata
-                shareOptionsModal.classList.remove('hidden');
-            }
 
             // Ana makbuz ekranındaki Paylaş butonu
             shareMainButton.addEventListener('click', () => {
                 if (payments.length > 0) {
-                    showShareOptionsModal(payments[0]); // En son oluşturulan makbuzu paylaş
+                    showShareOptionsModal(payments[0]);
                 } else {
                     alert('Paylaşılacak bir makbuz bulunmuyor.');
                 }
@@ -780,32 +861,8 @@ const firebaseConfig = {
 
             // Tüm Ödemeler Modalı kapatma
             closeAllPaymentsModalButton.addEventListener('click', () => {
-                showSection('paymentForm'); // Modalı kapatınca ödeme formuna geri dön
+                showSection('paymentForm');
             });
-
-            // Tüm ödemeleri modalda listele
-            function loadAllPayments() {
-                allPaymentsList.innerHTML = '';
-                if (payments.length === 0) {
-                    noAllPaymentsMessage.classList.remove('hidden');
-                } else {
-                    noAllPaymentsMessage.classList.add('hidden');
-                    payments.forEach(payment => {
-                        const paymentItem = document.createElement('div');
-                        paymentItem.classList.add('payment-item', 'rounded-lg', 'shadow-sm', 'bg-gray-50', 'p-4', 'flex', 'flex-col', 'justify-between');
-                        paymentItem.innerHTML = `
-                            <div>
-                                <p class="text-gray-700"><strong>Ödeyen:</strong> ${payment.payerName}</p>
-                                <p class="text-gray-700"><strong>Tutar:</strong> ${payment.paymentAmount.toFixed(2)} TL</p>
-                                <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
-                                <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
-                            </div>
-                            <!-- Paylaş butonu kaldırıldı -->
-                        `;
-                        allPaymentsList.appendChild(paymentItem);
-                    });
-                }
-            }
 
             // Ayarlar Butonu
             settingsButton.addEventListener('click', () => {
@@ -815,52 +872,20 @@ const firebaseConfig = {
                     return;
                 }
                 showSection('settingsModal');
-                // Ayarlar modalı açıldığında aylık rapor seçicilerini doldur
                 populateMonthYearSelectors();
-                monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
+                monthlyReportOutput.classList.add('hidden');
             });
 
             // Ayarlar Modalı kapatma
             closeSettingsModalButton.addEventListener('click', () => {
-                showSection('paymentForm'); // Modalı kapatınca ödeme formuna geri dön
+                showSection('paymentForm');
             });
-
-            // Ay ve Yıl Seçicilerini Doldur
-            function populateMonthYearSelectors() {
-                reportMonthSelect.innerHTML = '';
-                reportYearSelect.innerHTML = '';
-
-                const months = [
-                    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-                ];
-                const currentYear = new Date().getFullYear();
-
-                months.forEach((month, index) => {
-                    const option = document.createElement('option');
-                    option.value = index; // 0-11 arası ay indeksi
-                    option.textContent = month;
-                    reportMonthSelect.appendChild(option);
-                });
-
-                for (let i = currentYear - 5; i <= currentYear + 1; i++) {
-                    const option = document.createElement('option');
-                    option.value = i;
-                    option.textContent = i;
-                    if (i === currentYear) {
-                        option.selected = true;
-                    }
-                    reportYearSelect.appendChild(option);
-                }
-                reportMonthSelect.value = new Date().getMonth(); // Mevcut ayı seçili yap
-            }
 
             // Rapor Oluştur Butonu (Ayarlar modalı içinde)
             generateReportButton.addEventListener('click', () => {
                 const selectedMonth = parseInt(reportMonthSelect.value);
                 const selectedYear = parseInt(reportYearSelect.value);
 
-                // Seçeneklerin varlığını ve geçerliliğini kontrol et
                 if (isNaN(selectedMonth) || isNaN(selectedYear) || reportMonthSelect.options.length === 0) {
                     monthlyReportOutput.innerHTML = `<p class="text-red-600">Ay veya yıl seçimi geçersiz. Lütfen tekrar deneyin.</p>`;
                     monthlyReportOutput.classList.remove('hidden');
@@ -910,7 +935,7 @@ const firebaseConfig = {
 
 
             // Ödeme Kayıtlarını Sil Butonu (Ayarlar modalı içinde)
-            clearPaymentsButton.addEventListener('click', async () => { // async eklendi
+            clearPaymentsButton.addEventListener('click', async () => {
                 const enteredPassword = prompt("Tüm ödeme kayıtlarını silmek için şifreyi girin:");
                 if (enteredPassword !== clearPassword) {
                     alert("Yanlış şifre! Kayıtlar silinemedi.");
@@ -918,36 +943,29 @@ const firebaseConfig = {
                 }
 
                 if (confirm('Tüm ödeme kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
-                    if (window.db && window.appId) { // Firebase başlatıldıysa
+                    if (window.db && window.appId) {
                         try {
                             const paymentsColRef = window.collection(window.db, `artifacts/${window.appId}/public/data/payments`);
-                            const snapshot = await window.getDocs(paymentsColRef); // Tüm belgeleri al
+                            const snapshot = await window.getDocs(paymentsColRef);
                             const deletePromises = [];
                             snapshot.forEach((docItem) => {
                                 deletePromises.push(window.deleteDoc(window.doc(window.db, `artifacts/${window.appId}/public/data/payments`, docItem.id)));
                             });
-                            await Promise.all(deletePromises); // Tüm silme işlemlerini bekle
+                            await Promise.all(deletePromises);
                             alert('Tüm ödeme kayıtları başarıyla silindi.');
                         } catch (e) {
                             console.error("Belgeler silinirken hata oluştu: ", e);
                             alert("Kayıtlar silinirken bir hata oluştu.");
                         }
                     } else {
-                        payments = []; // Firebase yoksa yerel diziyi sıfırla
+                        payments = [];
                         alert('Tüm ödeme kayıtları silindi (yerel).');
                     }
-                    loadRecentPayments(); // Ana sayfadaki listeyi güncelle
-                    loadAllPayments(); // Modal'daki listeyi güncelle
-                    monthlyReportOutput.classList.add('hidden'); // Rapor çıktısını gizle
+                    loadRecentPayments();
+                    loadAllPayments();
+                    monthlyReportOutput.classList.add('hidden');
                 }
             });
-
-            // Sayfa yüklendiğinde son ödemeleri göster (eğer varsa)
-            // Firebase başlatıldığında loadPaymentsFromFirestore çağrılır.
-            // Eğer Firebase yoksa, bu fonksiyon local'den yükler.
-            if (!window.db) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
-                loadRecentPayments();
-            }
         });
     </script>
 </body>
