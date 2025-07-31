@@ -52,8 +52,8 @@
                             console.log("Anonim olarak oturum açıldı.");
                         }
                     } catch (error) {
-                        console.error("Firebase kimlik doğrulaması başarısız:", error);
-                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir.");
+                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error); // Daha açıklayıcı log
+                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin."); // Konsolu kontrol etme talimatı
                         userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
                         loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
                     }
@@ -291,50 +291,6 @@
 
         .modal-close-button:hover {
             color: #1f2937;
-        }
-
-        /* PDF Oluşturma ve Yazdırma için Gizli Konteyner Stilleri */
-        #pdfPrintContainer {
-            position: absolute; /* Ekran dışında konumlandır */
-            left: -9999px;
-            top: -9999px;
-            width: 210mm; /* A4 genişliği */
-            height: 297mm; /* A4 yüksekliği */
-            padding: 10mm; /* Kenar boşlukları */
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around; /* Makbuzları dikeyde eşit dağıt */
-            align-items: center;
-            z-index: -1; /* Diğer içeriğin altında kalmasını sağla */
-            visibility: hidden; /* HTML2PDF'in yakalaması için gizli ama render edilebilir */
-            opacity: 0; /* Tamamen şeffaf */
-        }
-        #pdfPrintContainer .receipt-item-for-pdf {
-            width: 100%;
-            max-width: 148mm; /* Yaklaşık A5 genişliği */
-            border: 1px dashed #9ca3af;
-            padding: 10mm;
-            margin-bottom: 5mm; /* İki makbuz arası boşluk */
-            box-sizing: border-box;
-            page-break-inside: avoid; /* Makbuzun ortadan bölünmemesini sağlar */
-        }
-        #pdfPrintContainer .receipt-item-for-pdf:last-child {
-            margin-bottom: 0;
-        }
-        #pdfPrintContainer .receipt-item-for-pdf.cutting-line {
-            border-bottom: 1px dashed #6b7280; /* Kesme çizgisi */
-            padding-bottom: 15mm; /* Çizgi altı boşluk */
-            margin-bottom: 15mm; /* Çizgi altı boşluk */
-        }
-        #pdfPrintContainer .receipt-item-for-pdf h3 {
-            font-size: 1.2rem;
-        }
-        #pdfPrintContainer .receipt-item-for-pdf p {
-            font-size: 0.8rem;
-        }
-        #pdfPrintContainer .receipt-item-for-pdf .receipt-total {
-            font-size: 0.9rem;
         }
 
         /* Yazdırma için özel stil */
@@ -883,6 +839,7 @@
 
                 // Dinamik olarak geçici bir konteyner oluştur
                 const tempPdfContainer = document.createElement('div');
+                // Stil ekle: A4 boyutunda, ekran dışında, görünmez
                 tempPdfContainer.style.position = 'absolute';
                 tempPdfContainer.style.left = '-9999px';
                 tempPdfContainer.style.top = '-9999px';
