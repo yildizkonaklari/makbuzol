@@ -11,18 +11,9 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase yapılandırması doğrudan buraya eklendi
-        const firebaseConfig = {
-            apiKey: "AIzaSyDx6buFRmcq8Llrf_YgMBelYvj19TIuSWs",
-            authDomain: "makbuz-ver.firebaseapp.com",
-            projectId: "makbuz-ver",
-            storageBucket: "makbuz-ver.firebasestorage.app",
-            messagingSenderId: "764022579482",
-            appId: "1:764022579482:web:60748b0e628e3d9f468ca3"
-        };
-        
-        // Canvas ortamından gelen global değişkenler
-        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // projectId'yi varsayılan appId olarak kullan
+        // Firebase global değişkenleri (Canvas ortamından sağlanır)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
@@ -46,14 +37,12 @@
                     try {
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
-                            console.log("Canvas tarafından sağlanan token ile oturum açıldı.");
                         } else {
                             await signInAnonymously(auth);
-                            console.log("Anonim olarak oturum açıldı.");
                         }
                     } catch (error) {
-                        console.error("Firebase kimlik doğrulaması başarısız oldu. Detaylar:", error); // Daha açıklayıcı log
-                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir. Lütfen tarayıcınızın konsolunu kontrol edin."); // Konsolu kontrol etme talimatı
+                        console.error("Firebase kimlik doğrulaması başarısız:", error);
+                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir.");
                         userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
                         loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
                     }
@@ -293,6 +282,51 @@
             color: #1f2937;
         }
 
+        /* PDF Oluşturma ve Yazdırma için Gizli Konteyner Stilleri */
+        #pdfPrintContainer {
+            position: absolute; /* Ekran dışında konumlandır */
+            left: -9999px;
+            top: -9999px;
+            width: 210mm; /* A4 genişliği */
+            height: 297mm; /* A4 yüksekliği */
+            padding: 10mm; /* Kenar boşlukları */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around; /* Makbuzları dikeyde eşit dağıt */
+            align-items: center;
+            z-index: -1; /* Diğer içeriğin altında kalmasını sağla */
+            visibility: hidden; /* HTML2PDF'in yakalaması için gizli ama render edilebilir */
+            opacity: 0; /* Tamamen şeffaf */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf {
+            width: 100%;
+            max-width: 148mm; /* Yaklaşık A5 genişliği */
+            border: 1px dashed #9ca3af;
+            padding: 10mm;
+            margin-bottom: 5mm; /* İki makbuz arası boşluk */
+            box-sizing: border-box;
+            page-break-inside: avoid; /* Makbuzun ortadan bölünmemesini sağlar */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf:last-child {
+            margin-bottom: 0;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf.cutting-line {
+            border-bottom: 1px dashed #6b7280; /* Kesme çizgisi */
+            padding-bottom: 15mm; /* Çizgi altı boşluk */
+            margin-bottom: 15mm; /* Çizgi altı boşluk */
+        }
+        #pdfPrintContainer .receipt-item-for-pdf h3 {
+            font-size: 1.2rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf p {
+            font-size: 0.8rem;
+        }
+        #pdfPrintContainer .receipt-item-for-pdf .receipt-total {
+            font-size: 0.9rem;
+        }
+
+
         /* Yazdırma için özel stil */
         @media print {
             body * {
@@ -416,7 +450,6 @@
                         <!-- Yıllar JavaScript ile doldurulacak -->
                     </select>
                     <button id="generateReportButton" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Raporu Göster</button>
-                    <button id="downloadReportPdfButton" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Raporu PDF İndir</button>
                 </div>
                 <div id="monthlyReportOutput" class="mt-4 p-3 bg-white border border-yellow-200 rounded-md hidden">
                     <!-- Aylık rapor buraya gelecek -->
@@ -449,8 +482,7 @@
     </div>
 
     <!-- PDF oluşturmak için gizli konteyner -->
-    <!-- Bu konteyner artık JS tarafından dinamik olarak oluşturulup kaldırılacak -->
-    <!-- <div id="pdfPrintContainer"></div> -->
+    <div id="pdfPrintContainer"></div>
 
     <script type="module">
         // Firebase modülleri window objesine eklendiği için burada tekrar import etmeye gerek yok.
@@ -551,7 +583,7 @@
             const q = window.query(paymentsColRef, window.orderBy('fullDate', 'desc'));
 
             window.onSnapshot(q, (snapshot) => {
-                payments = []; // Mevcut ödemeleri temizle
+                payments = [];
                 snapshot.forEach((docItem) => {
                     const data = docItem.data();
                     // fullDate ISO string'den Date objesine dönüştür
@@ -598,7 +630,6 @@
             const reportMonthSelect = document.getElementById('reportMonth');
             const reportYearSelect = document.getElementById('reportYear');
             const generateReportButton = document.getElementById('generateReportButton');
-            const downloadReportPdfButton = document.getElementById('downloadReportPdfButton'); // Yeni rapor PDF butonu
             const monthlyReportOutput = document.getElementById('monthlyReportOutput');
             const clearPaymentsButton = document.getElementById('clearPaymentsButton'); 
 
@@ -609,8 +640,7 @@
             const shareModalMailButton = document.getElementById('shareModalMailButton');
             const shareModalPrintButton = document.getElementById('shareModalPrintButton');
 
-            // PDF oluşturmak için gizli konteyner (artık dinamik olarak oluşturulacak)
-            // const pdfPrintContainer = document.getElementById('pdfPrintContainer'); 
+            const pdfPrintContainer = document.getElementById('pdfPrintContainer'); // PDF için gizli konteyner
 
             // Sayfa yüklendiğinde tüm modalları ve aksiyon alanlarını gizle
             allPaymentsModal.classList.add('hidden');
@@ -625,8 +655,8 @@
             
             // Firebase başlatıldığında ödemeler otomatik yüklenecek
             // Eğer Firebase config yoksa, yerel yükleme devreye girer.
-            if (!window.db) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
-                loadRecentPayments();
+            if (!window.firebaseConfig) {
+                loadRecentPayments(); // Sadece Firebase yoksa yerel yükleme yap
             }
 
 
@@ -802,31 +832,30 @@
 
             // Function to generate receipt HTML for PDF/Print
             function getReceiptHtmlContent(payment, isForPrint = false) {
-                const cuttingLineHtml = isForPrint ? `<div style="text-align:center; margin: 20px 0; font-size: 0.8em; color: #6b7280;">✂️ KESME ÇİZGİSİ ✂️</div>` : '';
+                const cuttingLineClass = isForPrint ? 'cutting-line' : '';
                 return `
-                    <div style="width: 148mm; margin: 0 auto; border: 1px dashed #9ca3af; padding: 10mm; box-sizing: border-box; page-break-inside: avoid;">
-                        <h3 style="text-align: center; font-weight: bold; font-size: 1.2rem; margin-bottom: 0.5rem; color: #1f2937;">${customTitle}</h3>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
+                    <div class="receipt-item-for-pdf ${cuttingLineClass}">
+                        <h3 class="text-center font-bold mb-2 text-gray-800">${customTitle}</h3>
+                        <div class="mb-2">
+                            <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
+                            <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
                         </div>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeyen Bilgileri:</p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
-                            ${payment.childName !== 'Belirtilmedi' ? `<p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
+                        <div class="mb-2">
+                            <p class="text-sm font-semibold text-gray-700 mb-1">Ödeyen Bilgileri:</p>
+                            <p class="receipt-line"><span><strong>Adı Soyadı:</strong></span> <span>${payment.payerName}</span></p>
+                            <p class="receipt-line"><span><strong>Telefon:</strong></span> <span>${payment.phoneNumber}</span></p>
+                            ${payment.childName !== 'Belirtilmedi' ? `<p class="receipt-line"><span><strong>Çocuk Adı:</strong></span> <span>${payment.childName}</span></p>` : ''}
                         </div>
-                        <div style="margin-bottom: 0.5rem;">
-                            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; color: #4b5563;">Ödeme Bilgileri:</p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
-                            <p style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8rem;"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
+                        <div class="mb-2">
+                            <p class="text-sm font-semibold text-gray-700 mb-1">Ödeme Bilgileri:</p>
+                            <p class="receipt-line"><span><strong>Açıklama:</strong></span> <span>${payment.paymentDescription}</span></p>
+                            <p class="receipt-line"><span><strong>Ödeme Şekli:</strong></span> <span>${payment.paymentMethod}</span></p>
                         </div>
-                        <div style="font-weight: bold; font-size: 0.9rem; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; display: flex; justify-content: space-between;">
-                            <span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span>
+                        <div class="receipt-total text-base font-bold text-gray-900">
+                            <p class="receipt-line"><span>Toplam Tutar:</span> <span>${payment.paymentAmount.toFixed(2)} TL</span></p>
                         </div>
-                        <p style="text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem;">Teşekkür ederiz!</p>
+                        <p class="text-center text-xs text-gray-600 mt-2">Teşekkür ederiz!</p>
                     </div>
-                    ${cuttingLineHtml}
                 `;
             }
 
@@ -837,23 +866,12 @@
                     return;
                 }
 
-                // Dinamik olarak geçici bir konteyner oluştur
-                const tempPdfContainer = document.createElement('div');
-                // Stil ekle: A4 boyutunda, ekran dışında, görünmez
-                tempPdfContainer.style.position = 'absolute';
-                tempPdfContainer.style.left = '-9999px';
-                tempPdfContainer.style.top = '-9999px';
-                tempPdfContainer.style.width = '210mm'; // A4 genişliği
-                tempPdfContainer.style.height = '297mm'; // A4 yüksekliği
-                tempPdfContainer.style.overflow = 'hidden';
-                tempPdfContainer.style.visibility = 'hidden';
-                tempPdfContainer.style.opacity = '0';
-                document.body.appendChild(tempPdfContainer);
-
                 if (action === 'download') {
-                    tempPdfContainer.innerHTML = getReceiptHtmlContent(paymentData);
-                    tempPdfContainer.style.visibility = 'visible';
-                    tempPdfContainer.style.opacity = '1';
+                    // Populate the hidden container with receipt content
+                    pdfPrintContainer.innerHTML = getReceiptHtmlContent(paymentData);
+                    // Temporarily make it visible for html2pdf to capture
+                    pdfPrintContainer.style.visibility = 'visible';
+                    pdfPrintContainer.style.opacity = '1';
 
                     const opt = {
                         margin:       10,
@@ -863,15 +881,19 @@
                         jsPDF:        { unit: 'mm', format: 'a5', orientation: 'portrait' }
                     };
                     
-                    await new Promise(resolve => setTimeout(resolve, 100)); // Gecikme
+                    // Add a small delay to ensure the content is rendered by the browser
+                    await new Promise(resolve => setTimeout(resolve, 100)); 
 
                     try {
-                        await html2pdf().set(opt).from(tempPdfContainer).save();
+                        await html2pdf().set(opt).from(pdfPrintContainer).save();
                     } catch (error) {
                         console.error("PDF oluşturulurken hata oluştu:", error);
                         alert("PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
                     } finally {
-                        document.body.removeChild(tempPdfContainer); // Geçici div'i kaldır
+                        // Hide the container again and clear content
+                        pdfPrintContainer.style.visibility = 'hidden';
+                        pdfPrintContainer.style.opacity = '0';
+                        pdfPrintContainer.innerHTML = '';
                     }
 
                 } else if (action === 'print') {
@@ -882,122 +904,38 @@
                     printWindow.document.write(`
                         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
                         body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-height: 297mm; }
-                        /* Makbuz öğesi için genel stil */
-                        .receipt-item-for-print {
+                        .receipt-item-for-pdf {
                             width: 148mm; /* A5 genişliği */
                             border: 1px dashed #9ca3af;
                             padding: 10mm;
+                            margin-bottom: 10mm; /* Makbuzlar arası boşluk */
                             box-sizing: border-box;
                             page-break-inside: avoid;
                         }
-                        /* İlk makbuzdan sonra kesme çizgisi ve boşluk */
-                        .receipt-item-for-print.cutting-line {
+                        .receipt-item-for-pdf:last-child { margin-bottom: 0; }
+                        .receipt-item-for-pdf.cutting-line {
                             border-bottom: 1px dashed #6b7280; /* Kesme çizgisi */
                             padding-bottom: 15mm;
                             margin-bottom: 15mm;
                         }
-                        .receipt-item-for-print h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
-                        .receipt-item-for-print p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
-                        .receipt-item-for-print .receipt-line { display: flex; justify-content: space-between; }
-                        .receipt-item-for-print .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
-                        .receipt-item-for-print .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
+                        .receipt-item-for-pdf h3 { text-align: center; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; color: #1f2937; }
+                        .receipt-item-for-pdf p { margin-bottom: 0.25rem; font-size: 0.8rem; line-height: 1.2; }
+                        .receipt-item-for-pdf .receipt-line { display: flex; justify-content: space-between; }
+                        .receipt-item-for-pdf .receipt-total { font-size: 0.9rem; font-weight: 600; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.75rem; }
+                        .receipt-item-for-pdf .receipt-footer { text-align: center; font-size: 0.7rem; color: #6b7280; margin-top: 0.75rem; }
                     `);
                     printWindow.document.write('</style>');
                     printWindow.document.write('</head><body>');
                     // İlk makbuz ve kesme çizgisi
-                    printWindow.document.write(getReceiptHtmlContent(paymentData, true).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
+                    printWindow.document.write(getReceiptHtmlContent(paymentData, true)); 
                     // İkinci makbuz
-                    printWindow.document.write(getReceiptHtmlContent(paymentData).replace(/receipt-item-for-pdf/g, 'receipt-item-for-print')); 
+                    printWindow.document.write(getReceiptHtmlContent(paymentData)); 
                     printWindow.document.write('</body></html>');
                     printWindow.document.close();
                     printWindow.focus();
                     printWindow.print();
                 }
             }
-
-            // Raporu PDF olarak indirme fonksiyonu
-            async function downloadMonthlyReportPdf(month, year, filteredPayments) {
-                if (filteredPayments.length === 0) {
-                    alert('Bu ay için indirilecek ödeme bulunmamaktadır.');
-                    return;
-                }
-
-                const tempReportContainer = document.createElement('div');
-                tempReportContainer.style.position = 'absolute';
-                tempReportContainer.style.left = '-9999px';
-                tempReportContainer.style.top = '-9999px';
-                tempReportContainer.style.width = '210mm'; // A4 genişliği
-                tempReportContainer.style.height = '297mm'; // A4 yüksekliği
-                tempReportContainer.style.overflow = 'hidden';
-                tempReportContainer.style.visibility = 'hidden';
-                tempReportContainer.style.opacity = '0';
-                document.body.appendChild(tempReportContainer);
-
-                let reportHtmlContent = `
-                    <div style="font-family: 'Inter', sans-serif; padding: 20mm; box-sizing: border-box; width: 210mm; height: 297mm;">
-                        <h2 style="text-align: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; color: #1f2937;">${reportMonthSelect.options[reportMonthSelect.selectedIndex].text} ${year} Ayı Ödeme Raporu</h2>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
-                            <thead>
-                                <tr style="background-color: #e5e7eb;">
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Makbuz No</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeyen</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tutar (TL)</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Tarih</th>
-                                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.9rem;">Ödeme Şekli</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                let totalAmount = 0;
-                filteredPayments.forEach(payment => {
-                    totalAmount += payment.paymentAmount;
-                    reportHtmlContent += `
-                        <tr>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">#${payment.id}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.payerName}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentAmount.toFixed(2)}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentDate}</td>
-                            <td style="border: 1px solid #d1d5db; padding: 8px; font-size: 0.85rem;">${payment.paymentMethod}</td>
-                        </tr>
-                    `;
-                });
-                reportHtmlContent += `
-                            </tbody>
-                            <tfoot>
-                                <tr style="background-color: #f3f4f6;">
-                                    <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: bold; font-size: 1rem;">Toplam Gelir:</td>
-                                    <td style="border: 1px solid #d1d5db; padding: 8px; font-weight: bold; font-size: 1rem;">${totalAmount.toFixed(2)}</td>
-                                    <td colspan="2" style="border: 1px solid #d1d5db; padding: 8px;"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                `;
-
-                tempReportContainer.innerHTML = reportHtmlContent;
-                tempReportContainer.style.visibility = 'visible';
-                tempReportContainer.style.opacity = '1';
-
-                const opt = {
-                    margin:       10,
-                    filename:     `aylik_rapor_${reportMonthSelect.options[reportMonthSelect.selectedIndex].text.toLowerCase()}_${year}.pdf`,
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, logging: true, dpi: 300, letterRendering: true },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' } // A4 boyutunda dikey
-                };
-
-                await new Promise(resolve => setTimeout(resolve, 100)); // Gecikme
-
-                try {
-                    await html2pdf().set(opt).from(tempReportContainer).save();
-                } catch (error) {
-                    console.error("Aylık rapor PDF oluşturulurken hata oluştu:", error);
-                    alert("Aylık rapor PDF oluşturulurken bir hata oluştu. Lütfen konsolu kontrol edin.");
-                } finally {
-                    document.body.removeChild(tempReportContainer); // Geçici div'i kaldır
-                }
-            }
-
 
             // WhatsApp ile paylaş (metin olarak)
             function sendWhatsAppReceipt(payment) {
@@ -1116,9 +1054,20 @@
                                 <p class="text-gray-700"><strong>Tarih:</strong> ${payment.paymentDate} ${payment.paymentTime}</p>
                                 <p class="text-gray-700"><strong>Açıklama:</strong> ${payment.paymentDescription}</p>
                             </div>
-                            <!-- Paylaş butonu kaldırıldı -->
+                            <button class="share-individual-button bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md mt-4 transition duration-200" data-payment-id="${payment.id}">Paylaş</button>
                         `;
                         allPaymentsList.appendChild(paymentItem);
+                    });
+
+                    // Her bir ödeme öğesi için paylaş butonuna olay dinleyici ekle
+                    document.querySelectorAll('.share-individual-button').forEach(button => {
+                        button.addEventListener('click', (event) => {
+                            const paymentId = parseInt(event.target.dataset.paymentId);
+                            const paymentToShare = payments.find(p => p.id === paymentId);
+                            if (paymentToShare) {
+                                showShareOptionsModal(paymentToShare);
+                            }
+                        });
                     });
                 }
             }
@@ -1201,25 +1150,6 @@
                 monthlyReportOutput.classList.remove('hidden');
             });
 
-            // Raporu PDF İndir butonu (Ayarlar modalı içinde)
-            downloadReportPdfButton.addEventListener('click', () => {
-                const selectedMonth = parseInt(reportMonthSelect.value);
-                const selectedYear = parseInt(reportYearSelect.value);
-
-                if (isNaN(selectedMonth) || isNaN(selectedYear) || reportMonthSelect.options.length === 0) {
-                    alert('Lütfen rapor indirmek için geçerli bir ay ve yıl seçin.');
-                    return;
-                }
-
-                const filteredPayments = payments.filter(payment => {
-                    const paymentDate = payment.fullDate;
-                    return paymentDate.getMonth() === selectedMonth && paymentDate.getFullYear() === selectedYear;
-                });
-
-                downloadMonthlyReportPdf(selectedMonth, selectedYear, filteredPayments);
-            });
-
-
             // Ödeme Kayıtlarını Sil Butonu (Ayarlar modalı içinde)
             clearPaymentsButton.addEventListener('click', async () => { // async eklendi
                 const enteredPassword = prompt("Tüm ödeme kayıtlarını silmek için şifreyi girin:");
@@ -1256,7 +1186,7 @@
             // Sayfa yüklendiğinde son ödemeleri göster (eğer varsa)
             // Firebase başlatıldığında loadPaymentsFromFirestore çağrılır.
             // Eğer Firebase yoksa, bu fonksiyon local'den yükler.
-            if (!window.db) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
+            if (!window.firebaseConfig) { // Sadece Firebase yoksa DOMContentLoaded'da yükle
                 loadRecentPayments();
             }
         });
