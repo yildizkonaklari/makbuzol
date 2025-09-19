@@ -412,6 +412,7 @@
                     </select>
                     <button id="generateReportButton" class="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">Listeyi Göster</button>
                 </div>
+                <!-- Raporun görüntüleneceği alana taşındı -->
                 <div id="monthlyReportOutput" class="mt-4 p-3 bg-white border border-yellow-200 rounded-md hidden">
                     <!-- Aylık rapor buraya gelecek -->
                 </div>
@@ -480,11 +481,10 @@
         let payments = [];
         // Özel başlık, artık sabit
         const customTitle = "YEŞİL İZ ANAOKULU";
-
-        // Şifreler (Sadece silme işlemi için tutuluyor)
-        const clearPassword = '1052';
-        const deletePassword = '1052'; // Yeni silme şifresi
-
+        
+        // Şifreler
+        const settingsPassword = '1052'; // Sadece Ayarlar için şifre
+        
         // Global variable to store the payment data for the currently displayed receipt
         let currentReceiptForShare = null;
         let currentReceiptForView = null;
@@ -685,6 +685,7 @@
         function getReportHtmlContent(payments, month, year, total) {
              let listItems = payments.map(p => `
                  <tr class="border-b border-gray-200 hover:bg-gray-100">
+                    <td class="py-2 px-4 no-print"><button class="view-report-btn" data-firestore-id="${p.firestoreId}">${getEyeIconSvg()}</button></td>
                     <td class="py-2 px-4">${p.paymentDate}</td>
                     <td class="py-2 px-4">${p.childName}</td>
                     <td class="py-2 px-4">${p.paymentDescription}</td>
@@ -698,21 +699,24 @@
                 <div class="p-8 font-sans">
                     <h1 class="text-2xl font-bold mb-4 text-center">${customTitle}</h1>
                     <h2 class="text-xl font-bold mb-6 text-center">Makbuz Listesi - ${month} ${year}</h2>
-                    <table class="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden">
-                        <thead class="bg-gray-200">
-                            <tr>
-                                <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Tarihi</th>
-                                <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Çocuk Adı</th>
-                                <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Açıklama</th>
-                                <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Şekli</th>
-                                <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Tutar</th>
-                                <th class="py-2 px-4 text-center text-sm font-semibold text-gray-600 no-print">Sil</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${listItems}
-                        </tbody>
-                    </table>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead class="bg-gray-200">
+                                <tr>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600 no-print"></th>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Tarihi</th>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Çocuk Adı</th>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Açıklama</th>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Şekli</th>
+                                    <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Tutar</th>
+                                    <th class="py-2 px-4 text-center text-sm font-semibold text-gray-600 no-print">Sil</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${listItems}
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="mt-8 text-xl font-bold text-right pr-4">
                         Toplam Gelir: ${total.toFixed(2)} TL
                     </div>
@@ -950,12 +954,6 @@
 
         // Ödeme silme fonksiyonu
         async function deletePayment(firestoreId) {
-            const enteredPassword = prompt("Bu kaydı silmek için şifreyi girin:");
-            if (enteredPassword !== deletePassword) {
-                alert("Yanlış şifre! Kayıt silinemedi.");
-                return;
-            }
-
             if (!confirm("Bu kaydı kalıcı olarak silmek istediğinizden emin misiniz?")) {
                 return;
             }
@@ -978,7 +976,7 @@
         // Tüm ana içerik alanlarını gizleyen ve isteneni gösteren yardımcı fonksiyon
         function showSection(sectionId) {
             // Null kontrolü
-            if (!paymentForm || !receiptDisplay || !receiptActions || !allPaymentsModal || !settingsModal || !shareOptionsModal || !addPaymentButton) return;
+            if (!paymentForm || !receiptDisplay || !receiptActions || !allPaymentsModal || !settingsModal || !shareOptionsModal || !addPaymentButton || !viewReceiptModal) return;
 
             // Tüm ana içerik alanlarını gizle
             paymentForm.classList.add('hidden');
@@ -1229,6 +1227,11 @@
             // Ayarlar Butonu
             if (settingsButton) {
                 settingsButton.addEventListener('click', () => {
+                    const enteredPassword = prompt("Ayarlar bölümüne erişmek için şifreyi girin:");
+                    if (enteredPassword !== settingsPassword) {
+                        alert("Yanlış şifre! Ayarlara erişilemedi.");
+                        return;
+                    }
                     showSection('settingsModal');
                     // Ayarlar modalı açıldığında aylık rapor seçicilerini doldur
                     populateMonthYearSelectors();
@@ -1270,25 +1273,26 @@
                         reportHtml += `<p class="text-gray-600">Bu ay için ödeme bulunmamaktadır.</p>`;
                     } else {
                         reportHtml += `
-                            <table class="w-full text-sm text-left text-gray-500">
-                                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="py-3 px-6"></th> <!-- Görünüm ikonu için boş başlık -->
-                                        <th scope="col" class="py-3 px-6">Ödeme Tarihi</th>
-                                        <th scope="col" class="py-3 px-6">Çocuk Adı</th>
-                                        <th scope="col" class="py-3 px-6">Açıklama</th>
-                                        <th scope="col" class="py-3 px-6">Ödeme Şekli</th>
-                                        <th scope="col" class="py-3 px-6">Tutar</th>
-                                        <th scope="col" class="py-3 px-6 text-center no-print">Sil</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                                    <thead class="bg-gray-200">
+                                        <tr>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600 no-print"></th>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Tarihi</th>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Çocuk Adı</th>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Açıklama</th>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Ödeme Şekli</th>
+                                            <th class="py-2 px-4 text-left text-sm font-semibold text-gray-600">Tutar</th>
+                                            <th class="py-2 px-4 text-center text-sm font-semibold text-gray-600 no-print">Sil</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                         `;
                         filteredPayments.forEach(payment => {
                             totalAmount += payment.paymentAmount;
                             reportHtml += `
                                 <tr class="bg-white border-b hover:bg-gray-50">
-                                    <td class="py-4 px-6"><button class="view-report-btn" data-firestore-id="${payment.firestoreId}">${getEyeIconSvg()}</button></td>
+                                    <td class="py-4 px-6 no-print"><button class="view-report-btn" data-firestore-id="${payment.firestoreId}">${getEyeIconSvg()}</button></td>
                                     <td class="py-4 px-6">${payment.paymentDate}</td>
                                     <td class="py-4 px-6">${payment.childName}</td>
                                     <td class="py-4 px-6">${payment.paymentDescription}</td>
@@ -1299,8 +1303,9 @@
                             `;
                         });
                         reportHtml += `
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
                         `;
                         reportHtml += `<p class="text-lg font-bold text-gray-900 mt-4">Toplam Gelir: ${totalAmount.toFixed(2)} TL</p>`;
                         reportHtml += `<button id="downloadReportPdfButton" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md mt-4 transition duration-200 w-full no-print">Raporu İndir</button>`;
@@ -1347,12 +1352,6 @@
             // Ödeme Kayıtlarını Sil Butonu (Ayarlar modalı içinde)
             if (clearPaymentsButton) {
                 clearPaymentsButton.addEventListener('click', async () => { // async eklendi
-                    const enteredPassword = prompt("Tüm ödeme kayıtlarını silmek için şifreyi girin:");
-                    if (enteredPassword !== clearPassword) {
-                        alert("Yanlış şifre! Kayıtlar silinemedi.");
-                        return;
-                    }
-
                     if (confirm('Tüm ödeme kayıtlarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
                         if (db) { // Firebase başlatıldıysa
                             try {
