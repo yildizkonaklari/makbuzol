@@ -354,6 +354,10 @@
                 <option value="Nakit">Nakit</option>
                 <option value="Kredi Kartı">Kredi Kartı</option>
             </select>
+            <select id="receiptTitle" class="block w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="YEŞİL İZ ANAOKULU">YEŞİL İZ ANAOKULU</option>
+                <option value="YEŞİL İZ YUVA">YEŞİL İZ YUVA</option>
+            </select>
             <div class="btn-group">
                 <button id="savePaymentButton" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-md transition duration-200">Makbuz Oluştur</button>
                 <button id="cancelPaymentButton" class="btn-secondary bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-md transition duration-200">İptal</button>
@@ -454,10 +458,10 @@
     <!-- PDF oluşturmak için gizli konteyner -->
     <div id="pdfPrintContainer"></div>
 
-    <script type="module">
+        <script type="module">
         // Firebase modüllerini import et
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDocs, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase global değişkenleri
@@ -469,7 +473,7 @@
           messagingSenderId: "984227422679",
           appId: "1:984227422679:web:8dfe6c3fec0a79832dab92"
         };
-        const appId = firebaseConfig.appId;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
@@ -623,13 +627,14 @@
             document.getElementById('paymentAmount').value = '';
             document.getElementById('phoneNumber').value = '';
             document.getElementById('paymentMethod').value = 'Nakit';
+            document.getElementById('receiptTitle').value = 'YEŞİL İZ ANAOKULU';
         }
 
         // Makbuzu HTML olarak oluştur ve göster
         function displayReceipt(payment) {
             if (!receiptDisplay) return; // Null kontrolü
             receiptDisplay.innerHTML = `
-                <h3 class="text-2xl font-bold mb-4 text-gray-800">${customTitle}</h3>
+                <h3 class="text-2xl font-bold mb-4 text-gray-800">${payment.receiptTitle}</h3>
                 <div class="mb-4">
                     <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
                     <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
@@ -657,7 +662,7 @@
             const cuttingLineClass = isForPrint ? 'cutting-line' : '';
             return `
                 <div class="receipt-item-for-pdf ${cuttingLineClass}">
-                    <h3 class="text-center font-bold mb-2 text-gray-800">${customTitle}</h3>
+                    <h3 class="text-center font-bold mb-2 text-gray-800">${payment.receiptTitle}</h3>
                     <div class="mb-2">
                         <p class="receipt-line"><span><strong>Makbuz No:</strong></span> <span>#${payment.id}</span></p>
                         <p class="receipt-line"><span><strong>Tarih:</strong></span> <span>${payment.paymentDate} ${payment.paymentTime}</span></p>
@@ -822,7 +827,7 @@
 
         // WhatsApp ile paylaş (metin olarak)
         function sendWhatsAppReceipt(payment) {
-            const message = `*${customTitle}*\n` +
+            const message = `*${payment.receiptTitle}*\n` +
                             `-----------------------------------\n` +
                             `Makbuz No: #${payment.id}\n` +
                             `Tarih: ${payment.paymentDate} ${payment.paymentTime}\n` +
@@ -847,7 +852,7 @@
 
         // E-posta ile paylaş
         function sendEmailReceipt(payment) {
-            const subject = encodeURIComponent(`${customTitle} - Makbuz No: #${payment.id}`);
+            const subject = encodeURIComponent(`${payment.receiptTitle} - Makbuz No: #${payment.id}`);
             const body = encodeURIComponent(
                 `Sayın ${payment.payerName},\n\n` +
                 `Ödemeniz başarıyla alınmıştır. İşte makbuz bilgileriniz:\n\n` +
@@ -998,33 +1003,40 @@
             }
         }
 
-        // Firebase ve Auth'u başlat
-        if (firebaseConfig) {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
+        // Firebase ve Auth'u başlatma
+        function initializeFirebase() {
+             try {
+                const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+                app = initializeApp(finalFirebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
 
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
-                    loadPaymentsFromFirestore(); // Kimlik doğrulandıktan sonra ödemeleri yükle
-                } else {
-                    // Kullanıcı oturum açmamışsa anonim olarak oturum aç
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (error) {
-                        console.error("Firebase anonim kimlik doğrulaması başarısız:", error);
-                        alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir.");
-                        userId = crypto.randomUUID(); // Fallback: rastgele bir ID ata
-                        loadPaymentsFromFirestore(); // Yine de ödemeleri yüklemeye çalış
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Firebase kimlik doğrulaması başarılı. Kullanıcı ID:", userId);
+                        loadPaymentsFromFirestore();
+                    } else {
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Firebase kimlik doğrulaması başarısız:", error);
+                            alert("Firebase kimlik doğrulaması başarısız oldu. Bazı özellikler çalışmayabilir.");
+                            userId = crypto.randomUUID();
+                            loadPaymentsFromFirestore();
+                        }
                     }
-                }
-            });
-        } else {
-            console.warn("Firebase yapılandırması bulunamadı. Çevrimdışı modda çalışılıyor.");
-            userId = crypto.randomUUID(); // Çevrimdışı kullanım için rastgele ID
+                });
+            } catch (error) {
+                console.warn("Firebase yapılandırması bulunamadı veya geçersiz. Çevrimdışı modda çalışılıyor.", error);
+                userId = crypto.randomUUID();
+            }
         }
+
 
         document.addEventListener('DOMContentLoaded', () => {
             // Tüm HTML elementlerini burada tanımla
@@ -1075,6 +1087,8 @@
             if (paymentForm) paymentForm.classList.remove('hidden'); 
             if (addPaymentButton) addPaymentButton.classList.add('hidden'); 
             
+            initializeFirebase();
+
             // Ödeme Ekle butonu
             if (addPaymentButton) {
                 addPaymentButton.addEventListener('click', () => {
@@ -1107,6 +1121,7 @@
                     const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
                     const phoneNumber = document.getElementById('phoneNumber').value.trim();
                     const paymentMethod = document.getElementById('paymentMethod').value;
+                    const receiptTitle = document.getElementById('receiptTitle').value;
                     const paymentDate = new Date(); // Bugünün tarihi
 
                     if (!payerName || isNaN(paymentAmount) || paymentAmount <= 0) {
@@ -1116,6 +1131,7 @@
 
                     const paymentData = {
                         id: await generateReceiptId(), // Benzersiz ID için yeni fonksiyonu kullan
+                        receiptTitle: receiptTitle,
                         payerName,
                         childName: childName || 'Belirtilmedi',
                         paymentDescription: paymentDescription || 'Yok',
